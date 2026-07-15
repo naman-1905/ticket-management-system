@@ -1,0 +1,10 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+    container_name: ticketing-backend
+
+    ports:
+      - "8001:8000"
