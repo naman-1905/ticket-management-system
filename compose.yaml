@@ -8,3 +8,6 @@ services:
 
     ports:
       - "8001:8000"
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
