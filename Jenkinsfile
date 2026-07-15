@@ -23,7 +23,7 @@ pipeline {
             steps {
                 withCredentials([
                     file(
-                        credentialsId: 'ticketing-backend-env',
+                        credentialsId: 'Ticket-Backend-Env',
                         variable: 'ENV_FILE'
                     )
                 ]) {
