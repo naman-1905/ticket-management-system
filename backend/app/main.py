@@ -41,7 +41,7 @@ async def report_dependency_connections():
     rabbit_target = urlsplit(settings.rabbitmq_url)
     print(f"[connections] RabbitMQ {rabbit_target.hostname or 'configured-host'}:{rabbit_target.port or 5672} -> {'CONNECTED' if rabbit_ok else 'UNAVAILABLE'}", flush=True)
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(application: FastAPI):
     configure_logging()
     await report_dependency_connections()
     if settings.environment == "development":
@@ -51,8 +51,8 @@ async def lifespan(app: FastAPI):
         except Exception:
             # Local development may start before Postgres; healthz reports the dependency state.
             if settings.environment not in {"development", "test"}: raise
-    stop_event = __import__("asyncio").Event(); app.state.stop_event = stop_event
-    worker = __import__("asyncio").create_task(sla_worker(stop_event)); app.state.sla_worker = worker
+    stop_event = __import__("asyncio").Event(); application.state.stop_event = stop_event
+    worker = __import__("asyncio").create_task(sla_worker(stop_event)); application.state.sla_worker = worker
     yield
     stop_event.set(); worker.cancel(); await __import__("asyncio").gather(worker, return_exceptions=True)
     await engine.dispose()
