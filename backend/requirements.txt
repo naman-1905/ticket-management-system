@@ -1,4 +1,13 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-psycopg[binary]
+fastapi>=0.115
+uvicorn[standard]>=0.30
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+pydantic-settings>=2.6
+email-validator>=2.2
+argon2-cffi>=23.1
+PyJWT>=2.9
+redis>=5.2
+aio-pika>=9.5
+structlog>=24.4
+prometheus-fastapi-instrumentator>=7.0
+alembic>=1.14
