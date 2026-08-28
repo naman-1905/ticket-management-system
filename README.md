@@ -14,19 +14,21 @@ From the repository root:
 
 ```powershell
 Copy-Item .env.example .env
-docker compose up --build
+docker compose --profile local up --build
 ```
 
-The API is available at http://localhost:8001, Swagger UI at http://localhost:8001/docs, ReDoc at http://localhost:8001/redoc, and RabbitMQ management at http://localhost:15672 (`guest` / `guest`).
+The API is available at http://localhost:8000, Swagger UI at http://localhost:8000/docs, ReDoc at http://localhost:8000/redoc, and RabbitMQ management at http://localhost:15672 (`guest` / `guest`).
 
 The stack starts PostgreSQL, Redis, RabbitMQ, and the API. In development mode, the API creates its SQLAlchemy tables during startup. Stop it with `docker compose down`.
+
+For deployment on a server that already provides PostgreSQL, Redis, and RabbitMQ, do not start the local infrastructure profile. Set `POSTGRES_HOST`, `REDIS_URL`, `RABBITMQ_URL`, and the credentials/secrets in `.env`, then run `docker compose up -d --build api`. The Jenkins pipeline applies `alembic upgrade head` before recreating the API container.
 
 ## Run the API locally
 
 Start the backing services:
 
 ```powershell
-docker compose up -d postgres redis rabbitmq
+docker compose --profile local up -d postgres redis rabbitmq
 ```
 
 Create and activate a virtual environment from the repository root:
@@ -51,14 +53,16 @@ Copy-Item .env.example .env
 
 For a locally running API, set `POSTGRES_HOST=localhost`, `REDIS_URL=redis://localhost:6379/0`, and `RABBITMQ_URL=amqp://guest:guest@localhost:5672/` in `.env`.
 
+Production must use `ENVIRONMENT=production` and a randomly generated `JWT_SECRET` of at least 32 characters. Secrets are read only from environment variables; `.env` is intentionally ignored by Git.
+
 Run Uvicorn:
 
 ```powershell
 Set-Location backend
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8001/docs.
+Open http://127.0.0.1:8000/docs.
 
 ## First API request
 
@@ -66,7 +70,7 @@ Register a customer account through Swagger UI or PowerShell:
 
 ```powershell
 $body = @{ email = "customer@example.com"; full_name = "Example Customer"; password = "change-me-123" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8001/api/v1/auth/register -ContentType "application/json" -Body $body
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/auth/register -ContentType "application/json" -Body $body
 ```
 
 Use the returned bearer token with Swagger UI's `Authorize` button. Mutating ticket and comment requests may include an `Idempotency-Key` header.
@@ -74,8 +78,8 @@ Use the returned bearer token with Swagger UI's `Authorize` button. Mutating tic
 ## Health checks
 
 ```powershell
-Invoke-RestMethod http://127.0.0.1:8001/healthz
-Invoke-RestMethod http://127.0.0.1:8001/health/db
+Invoke-RestMethod http://127.0.0.1:8000/healthz
+Invoke-RestMethod http://127.0.0.1:8000/health/db
 ```
 
 `/healthz` reports API liveness and PostgreSQL reachability. A `db: down` response means the API is running but PostgreSQL is unavailable or its environment variables are incorrect.
