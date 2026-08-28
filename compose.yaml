@@ -34,8 +34,18 @@ services:
 
     env_file:
       - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
 
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
     restart: unless-stopped
+    networks:
+      - private
+
+networks:
+  private:
+    external: true
+    name: naman-private-network
