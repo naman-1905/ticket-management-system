@@ -12,16 +12,22 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - private
   redis:
     profiles: [local]
     image: redis:7-alpine
     ports: ["6379:6379"]
     healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10 }
+    networks:
+      - private
   rabbitmq:
     profiles: [local]
     image: rabbitmq:3-management-alpine
     ports: ["5672:5672", "15672:15672"]
     healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 10s, timeout: 5s, retries: 10 }
+    networks:
+      - private
   api:
     build:
       context: ./backend

@@ -18,6 +18,14 @@ Copy-Item .env.example .env
 docker compose --profile local up --build
 ```
 
+On Linux/macOS, or from Git Bash/WSL on Windows, the same stack can be started with the repository helper:
+
+```bash
+./start.sh
+```
+
+The script creates `.env` from `.env.example` when needed, ensures the shared Docker network exists, and starts the frontend and backend dependencies together. Press `Ctrl+C` to stop the foreground Compose stack; use `docker compose down` to remove its containers.
+
 The frontend is available at http://localhost:3000, the API at http://localhost:8000, Swagger UI at http://localhost:8000/docs, ReDoc at http://localhost:8000/redoc, and RabbitMQ management at http://localhost:15672 (`guest` / `guest`).
 
 The stack starts PostgreSQL, Redis, RabbitMQ, and the API. In development mode, the API creates its SQLAlchemy tables during startup. Stop it with `docker compose down`.
