@@ -1,13 +1,35 @@
 # Ticket Management System
 
-Full-stack ticket management system with a FastAPI backend and a JavaScript Next.js frontend. Includes PostgreSQL, Redis, RabbitMQ, JWT authentication, role-based access control, SLA support, audit logging, and OpenAPI documentation.
+Full-stack support ticketing platform with an asynchronous FastAPI backend and a Next.js frontend. It supports customers, agents, and administrators with ticket lifecycle management, comments, SLA tracking, audit logging, JWT authentication, and role-based access control.
 
-## Requirements
+The backend is the current MVP contract. The frontend is being implemented toward the Beacon UX described in [frontend-implementation-plan.md](frontend-implementation-plan.md). Detailed backend behavior is documented in [backend_implementation.md](backend_implementation.md).
 
-- Python 3.12+
-- Docker Desktop and Docker Compose for the full local stack
-- Git
-- Node.js 22+ (for local frontend development)
+## Product scope
+
+- Customers create, view, and comment on their own tickets.
+- Agents manage the shared queue, assign tickets, change status, and write public or internal comments.
+- Administrators manage roles, SLA policies, and audit logs.
+- Tickets use the state machine `OPEN → IN_PROGRESS → ON_HOLD → RESOLVED → CLOSED`; the UI should expose only valid transitions.
+- Priorities are `P1` through `P4`, with first-response and resolution deadlines from the active SLA policy.
+- Ticket and comment writes support the optional `Idempotency-Key` header for safe retries.
+- API errors use `{ error: { code, message, details }, request_id }`.
+
+## Technology
+
+### Backend
+
+- Python 3.12+, FastAPI, Uvicorn, Pydantic v2
+- SQLAlchemy 2 async ORM with PostgreSQL 16 and psycopg
+- Alembic migrations
+- Argon2 password hashing and PyJWT access/refresh tokens
+- Structured JSON logging, request IDs, and Prometheus HTTP metrics
+- Redis and RabbitMQ configured as infrastructure dependencies
+
+### Frontend
+
+The repository currently contains a JavaScript Next.js application. The target frontend plan specifies Next.js 16 App Router, React 19, TypeScript strict mode, Tailwind CSS v4, shadcn/ui/Radix, Lucide, Motion, Sonner, TanStack Query, Zustand, React Hook Form, Zod, and OpenAPI-generated types. The target test stack is Vitest/Testing Library plus Playwright.
+
+The planned UI is a dense, keyboard-friendly ticket queue with dark/light themes, optimistic ticket/status/assignment/comment updates, ticket details as an intercepted slide-over or shareable full page, a `Cmd/Ctrl+K` command palette, and unmistakable public/internal comment separation.
 
 ## Run with Docker Compose
 
@@ -18,19 +40,21 @@ Copy-Item .env.example .env
 docker compose --profile local up --build
 ```
 
-On Linux/macOS, or from Git Bash/WSL on Windows, the same stack can be started with the repository helper:
+On Linux/macOS or Git Bash/WSL:
 
 ```bash
 ./start.sh
 ```
 
-The script creates `.env` from `.env.example` when needed, ensures the shared Docker network exists, and starts the frontend and backend dependencies together. Press `Ctrl+C` to stop the foreground Compose stack; use `docker compose down` to remove its containers.
+The local profile starts PostgreSQL, Redis, RabbitMQ, the API, and the frontend:
 
-The frontend is available at http://localhost:3000, the API at http://localhost:8000, Swagger UI at http://localhost:8000/docs, ReDoc at http://localhost:8000/redoc, and RabbitMQ management at http://localhost:15672 (`guest` / `guest`).
+- Frontend: http://localhost:3000
+- API: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- RabbitMQ management: http://localhost:15672 (`guest` / `guest`)
 
-The stack starts PostgreSQL, Redis, RabbitMQ, and the API. In development mode, the API creates its SQLAlchemy tables during startup. Stop it with `docker compose down`.
-
-The `frontend` service builds a standalone Next.js container and connects to the API using `NEXT_PUBLIC_API_URL`. For local Compose use the default; for a deployed server set it to the public backend URL (for example `http://192.168.1.38:8000/api/v1`) before building.
+Stop the stack with `docker compose down`. `NEXT_PUBLIC_API_URL` defaults to `http://localhost:8000/api/v1`; set it to the public backend URL for another host. The backend's `CORS_ORIGINS` must include the deployed frontend origin.
 
 ## Run the frontend locally
 
@@ -41,70 +65,78 @@ npm install
 npm run dev
 ```
 
-The frontend uses JavaScript only. Registering a new account creates a customer; agents and administrators can be promoted through the backend role endpoint or the admin Settings page.
-
-For deployment on a server that already provides PostgreSQL, Redis, and RabbitMQ, do not start the local infrastructure profile. Set `POSTGRES_HOST`, `REDIS_URL`, `RABBITMQ_URL`, and the credentials/secrets in `.env`, then run `docker compose up -d --build api`. The Jenkins pipeline applies `alembic upgrade head` before recreating the API container.
+Open http://localhost:3000. New registrations create `CUSTOMER` accounts. Agents and administrators can be promoted through the backend role endpoint or administrative settings UI.
 
 ## Run the API locally
 
-Start the backing services:
+Start backing services:
 
 ```powershell
 docker compose --profile local up -d postgres redis rabbitmq
 ```
 
-Create and activate a virtual environment from the repository root:
+Create a virtual environment and install dependencies:
 
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-Install all runtime and development dependencies:
-
-```powershell
 python -m pip install --upgrade pip
 python -m pip install -r backend\requirements-dev.txt
-```
-
-Create the environment file:
-
-```powershell
 Copy-Item .env.example .env
 ```
 
-For a locally running API, set `POSTGRES_HOST=localhost`, `REDIS_URL=redis://localhost:6379/0`, and `RABBITMQ_URL=amqp://guest:guest@localhost:5672/` in `.env`.
+For an API running outside Docker, set `POSTGRES_HOST=localhost`, `REDIS_URL=redis://localhost:6379/0`, and `RABBITMQ_URL=amqp://guest:guest@localhost:5672/` in `.env`.
 
-Production must use `ENVIRONMENT=production` and a randomly generated `JWT_SECRET` of at least 32 characters. Secrets are read only from environment variables; `.env` is intentionally ignored by Git.
-
-Run Uvicorn:
+Run the API:
 
 ```powershell
 Set-Location backend
 ..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Open http://127.0.0.1:8000/docs.
+Development startup creates SQLAlchemy tables automatically. Production deployments must run `alembic upgrade head` first, use `ENVIRONMENT=production`, and provide a randomly generated `JWT_SECRET` of at least 32 characters. Never commit `.env` or production secrets.
+
+## API overview
+
+All versioned endpoints are under `/api/v1`. Protected requests use:
+
+```http
+Authorization: Bearer <access_token>
+```
+
+| Area | Endpoints |
+|---|---|
+| Authentication | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`; `GET /auth/me` |
+| Tickets | `POST /tickets`, `GET /tickets`, `GET /tickets/{id}`, `PATCH /tickets/{id}/status`, `POST /tickets/{id}/assign` |
+| Comments | `GET/POST /tickets/{id}/comments` |
+| SLA | `GET /sla/policies`, `POST/PATCH /sla/policies`; `GET /tickets/{id}/sla` |
+| Administration | `GET /audit/logs`; `GET /users`; `PATCH /users/{id}/role` |
+
+Access tokens last 15 minutes by default. Refresh tokens rotate and are invalidated on reuse; a frontend refresh failure should clear the session and return to login. Login is rate-limited to five attempts per 60 seconds per client IP by default.
+
+Operational endpoints include `/healthz`, `/health`, `/health/db`, `/api/v1/meta/version`, `/docs`, and `/redoc`. Responses include `X-Request-ID` and `X-Response-Time-Ms` headers.
+
+## Frontend routes
+
+| Route | Access |
+|---|---|
+| `/login`, `/register` | Public |
+| `/tickets`, `/tickets/new`, `/tickets/[ticketId]` | All authenticated roles; ownership is enforced by the API |
+| `/settings/profile` | All authenticated roles |
+| `/settings/sla` | Agents read; administrators read/write |
+| `/settings/audit-log` | Administrators only |
+| `/settings/members` | Administrators only; role management |
+
+Ticket details open as a slide-over from the queue and as a full page for direct navigation, refreshes, and shared links. The frontend should handle ownership-hidden `404` responses generically so ticket existence is not disclosed.
 
 ## First API request
-
-Register a customer account through Swagger UI or PowerShell:
 
 ```powershell
 $body = @{ email = "customer@example.com"; full_name = "Example Customer"; password = "change-me-123" } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/auth/register -ContentType "application/json" -Body $body
 ```
 
-Use the returned bearer token with Swagger UI's `Authorize` button. Mutating ticket and comment requests may include an `Idempotency-Key` header.
-
-## Health checks
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/healthz
-Invoke-RestMethod http://127.0.0.1:8000/health/db
-```
-
-`/healthz` reports API liveness and PostgreSQL reachability. A `db: down` response means the API is running but PostgreSQL is unavailable or its environment variables are incorrect.
+Use the returned access token with Swagger UI's `Authorize` button. Include an `Idempotency-Key` on ticket/comment submissions and preserve `request_id` when reporting failures.
 
 ## Tests and quality checks
 
@@ -116,14 +148,37 @@ ruff check backend/app
 mypy backend/app
 ```
 
+Frontend test commands will be added as the planned TypeScript/TanStack Query implementation lands.
+
 ## Project layout
 
-The backend lives under `backend/app`: `core` contains settings, security, logging, errors, and idempotency; `db` contains async SQLAlchemy setup; and `modules` contains identity, ticketing, SLA, audit, and notification domains. The frontend lives under `frontend/app` and `frontend/components`, with the API integration in `frontend/lib/api.js`.
+```text
+backend/app/
+├── core/                  Configuration, security, errors, logging, idempotency
+├── db/                    Async SQLAlchemy setup
+└── modules/
+    ├── identity/          Registration, login, refresh, users, roles
+    ├── ticketing/         Tickets, status, assignment, comments, events
+    ├── sla/               Policies, deadlines, breach worker
+    ├── audit/             Action history and admin queries
+    └── notifications/     Notification model and consumer boundary
 
-## Jenkins deployment
+frontend/
+├── app/                   App Router pages and layouts
+├── components/            Auth and ticket UI components
+└── lib/                   API integration
+```
 
-The Jenkinsfile has a `PIPELINE_TARGET` choice parameter: `frontend`, `backend`, or `both`. Backend deployments run migrations and health checks; frontend deployments build and recreate only `ticketing-frontend`. The server must have the repository checked out, Docker Compose installed, and the Jenkins credential `Ticket-Backend-Env` available. Ensure that the backend `CORS_ORIGINS` includes the frontend origin.
+## Current limitations
 
-## Configuration
+- Redis is configured, but idempotency and login rate limiting currently use process-local memory.
+- RabbitMQ is configured, but the event bus is currently in memory; events are not durable or shared across API replicas.
+- Notification delivery is not implemented; publishing an event does not guarantee an email or in-app notification.
+- SLA resolution breach monitoring is implemented, but first-response tracking is not automatically completed from comments.
+- User activate/deactivate endpoints are not currently exposed.
+- Ticket responses contain core fields; related profiles, comment counts, and expanded SLA data may require separate requests.
+- The version endpoint returns `git_sha: "unknown"` unless deployment logic supplies a value.
 
-Settings are loaded from environment variables using `pydantic-settings`. See [.env.example](.env.example) for the complete reference. Do not use the example JWT secret outside local development.
+## Deployment
+
+Jenkins supports `PIPELINE_TARGET=frontend`, `backend`, or `both`. Backend deployments run Alembic migrations and health checks; frontend deployments build and recreate only the frontend container. A production host needs Docker Compose, the checked-out repository, environment-specific secrets, and the `Ticket-Backend-Env` Jenkins credential. Configure `CORS_ORIGINS` with the actual frontend origin.
