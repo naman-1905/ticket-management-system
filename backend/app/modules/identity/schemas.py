@@ -7,3 +7,4 @@ class RegisterIn(BaseModel): email: EmailStr; full_name: str = Field(min_length=
 class LoginIn(BaseModel): email: EmailStr; password: str
 class TokenOut(BaseModel): access_token: str; refresh_token: str; token_type: str = "bearer"
 class RefreshIn(BaseModel): refresh_token: str
+class RoleUpdate(BaseModel): role: str = Field(pattern="^(CUSTOMER|AGENT|ADMIN)$")
