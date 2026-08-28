@@ -1,3 +1,4 @@
+import logging
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -9,7 +10,15 @@ class ConflictError(AppError):
     def __init__(self, message="Conflict", code="CONFLICT"): super().__init__(code, message, 409)
 class ForbiddenError(AppError):
     def __init__(self, message="Forbidden"): super().__init__("FORBIDDEN", message, 403)
+class RateLimitError(AppError):
+    def __init__(self, message="Too many requests"): super().__init__("RATE_LIMITED", message, 429)
 def register_exception_handlers(app):
-    async def app_error(_: Request, exc: AppError): return JSONResponse(exc.status_code, {"error": {"code": exc.code, "message": exc.message, "details": exc.details}})
-    async def validation(_: Request, exc: RequestValidationError): return JSONResponse(422, {"error": {"code": "VALIDATION_ERROR", "message": "Request validation failed", "details": {"fields": exc.errors()}}})
+    async def app_error(request: Request, exc: AppError):
+        return JSONResponse(exc.status_code, {"error": {"code": exc.code, "message": exc.message, "details": exc.details}, "request_id": getattr(request.state, "request_id", None)})
+    async def validation(request: Request, exc: RequestValidationError):
+        return JSONResponse(422, {"error": {"code": "VALIDATION_ERROR", "message": "Request validation failed", "details": {"fields": exc.errors()}}, "request_id": getattr(request.state, "request_id", None)})
+    async def unexpected(request: Request, exc: Exception):
+        logging.getLogger(__name__).exception("unhandled_exception", exc_info=exc)
+        return JSONResponse(500, {"error": {"code": "INTERNAL_ERROR", "message": "Internal server error", "details": {}}, "request_id": getattr(request.state, "request_id", None)})
     app.add_exception_handler(AppError, app_error); app.add_exception_handler(RequestValidationError, validation)
+    app.add_exception_handler(Exception, unexpected)
