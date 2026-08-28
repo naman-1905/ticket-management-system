@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    parameters {
+        choice(name: 'PIPELINE_TARGET', choices: ['frontend', 'backend', 'both'], description: 'Choose which application to build and deploy')
+    }
+
     options {
         disableConcurrentBuilds()
         timestamps()
@@ -36,6 +40,7 @@ pipeline {
         }
 
         stage('Validate Compose') {
+            when { expression { params.PIPELINE_TARGET != 'frontend' } }
             steps {
                 sh '''
                     docker compose config --quiet
@@ -46,7 +51,13 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
-                    docker compose build ${SERVICE_NAME}
+                    if [ "${PIPELINE_TARGET}" = "frontend" ]; then
+                        docker compose build frontend
+                    elif [ "${PIPELINE_TARGET}" = "backend" ]; then
+                        docker compose build api
+                    else
+                        docker compose build api frontend
+                    fi
                 '''
             }
         }
@@ -54,15 +65,21 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
-                    docker compose run --rm ${SERVICE_NAME} alembic upgrade head
-                    docker compose up -d \
-                        --force-recreate \
-                        ${SERVICE_NAME}
+                    if [ "${PIPELINE_TARGET}" = "frontend" ]; then
+                        docker compose up -d --force-recreate frontend
+                    elif [ "${PIPELINE_TARGET}" = "backend" ]; then
+                        docker compose run --rm api alembic upgrade head
+                        docker compose up -d --force-recreate api
+                    else
+                        docker compose run --rm api alembic upgrade head
+                        docker compose up -d --force-recreate api frontend
+                    fi
                 '''
             }
         }
 
         stage('Health Check') {
+            when { expression { params.PIPELINE_TARGET != 'frontend' } }
             steps {
                 sh '''
                     echo "Waiting for backend to start..."
@@ -99,7 +116,7 @@ pipeline {
 
     post {
         success {
-            echo 'Ticket Management Backend deployed successfully'
+                    echo "Ticket Management ${params.PIPELINE_TARGET} deployed successfully"
         }
 
         failure {

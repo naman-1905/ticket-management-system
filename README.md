@@ -1,12 +1,13 @@
 # Ticket Management System
 
-FastAPI backend for ticket management with PostgreSQL, Redis, RabbitMQ, JWT authentication, role-based access control, SLA support, audit logging, and OpenAPI documentation.
+Full-stack ticket management system with a FastAPI backend and a JavaScript Next.js frontend. Includes PostgreSQL, Redis, RabbitMQ, JWT authentication, role-based access control, SLA support, audit logging, and OpenAPI documentation.
 
 ## Requirements
 
 - Python 3.12+
 - Docker Desktop and Docker Compose for the full local stack
 - Git
+- Node.js 22+ (for local frontend development)
 
 ## Run with Docker Compose
 
@@ -17,9 +18,22 @@ Copy-Item .env.example .env
 docker compose --profile local up --build
 ```
 
-The API is available at http://localhost:8000, Swagger UI at http://localhost:8000/docs, ReDoc at http://localhost:8000/redoc, and RabbitMQ management at http://localhost:15672 (`guest` / `guest`).
+The frontend is available at http://localhost:3000, the API at http://localhost:8000, Swagger UI at http://localhost:8000/docs, ReDoc at http://localhost:8000/redoc, and RabbitMQ management at http://localhost:15672 (`guest` / `guest`).
 
 The stack starts PostgreSQL, Redis, RabbitMQ, and the API. In development mode, the API creates its SQLAlchemy tables during startup. Stop it with `docker compose down`.
+
+The `frontend` service builds a standalone Next.js container and connects to the API using `NEXT_PUBLIC_API_URL`. For local Compose use the default; for a deployed server set it to the public backend URL (for example `http://192.168.1.38:8000/api/v1`) before building.
+
+## Run the frontend locally
+
+```powershell
+Set-Location frontend
+Copy-Item .env.example .env.local
+npm install
+npm run dev
+```
+
+The frontend uses JavaScript only. Registering a new account creates a customer; agents and administrators can be promoted through the backend role endpoint or the admin Settings page.
 
 For deployment on a server that already provides PostgreSQL, Redis, and RabbitMQ, do not start the local infrastructure profile. Set `POSTGRES_HOST`, `REDIS_URL`, `RABBITMQ_URL`, and the credentials/secrets in `.env`, then run `docker compose up -d --build api`. The Jenkins pipeline applies `alembic upgrade head` before recreating the API container.
 
@@ -96,7 +110,11 @@ mypy backend/app
 
 ## Project layout
 
-The application lives under `backend/app`: `core` contains settings, security, logging, errors, and idempotency; `db` contains async SQLAlchemy setup; and `modules` contains identity, ticketing, SLA, audit, and notification domains.
+The backend lives under `backend/app`: `core` contains settings, security, logging, errors, and idempotency; `db` contains async SQLAlchemy setup; and `modules` contains identity, ticketing, SLA, audit, and notification domains. The frontend lives under `frontend/app` and `frontend/components`, with the API integration in `frontend/lib/api.js`.
+
+## Jenkins deployment
+
+The Jenkinsfile has a `PIPELINE_TARGET` choice parameter: `frontend`, `backend`, or `both`. Backend deployments run migrations and health checks; frontend deployments build and recreate only `ticketing-frontend`. The server must have the repository checked out, Docker Compose installed, and the Jenkins credential `Ticket-Backend-Env` available. Ensure that the backend `CORS_ORIGINS` includes the frontend origin.
 
 ## Configuration
 
