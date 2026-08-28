@@ -54,6 +54,7 @@ pipeline {
         stage('Deploy') {
             steps {
                 sh '''
+                    docker compose run --rm ${SERVICE_NAME} alembic upgrade head
                     docker compose up -d \
                         --force-recreate \
                         ${SERVICE_NAME}
