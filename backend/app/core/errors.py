@@ -14,11 +14,11 @@ class RateLimitError(AppError):
     def __init__(self, message="Too many requests"): super().__init__("RATE_LIMITED", message, 429)
 def register_exception_handlers(app):
     async def app_error(request: Request, exc: AppError):
-        return JSONResponse(exc.status_code, {"error": {"code": exc.code, "message": exc.message, "details": exc.details}, "request_id": getattr(request.state, "request_id", None)})
+        return JSONResponse({"error": {"code": exc.code, "message": exc.message, "details": exc.details}, "request_id": getattr(request.state, "request_id", None)}, status_code=exc.status_code)
     async def validation(request: Request, exc: RequestValidationError):
-        return JSONResponse(422, {"error": {"code": "VALIDATION_ERROR", "message": "Request validation failed", "details": {"fields": exc.errors()}}, "request_id": getattr(request.state, "request_id", None)})
+        return JSONResponse({"error": {"code": "VALIDATION_ERROR", "message": "Request validation failed", "details": {"fields": exc.errors()}}, "request_id": getattr(request.state, "request_id", None)}, status_code=422)
     async def unexpected(request: Request, exc: Exception):
         logging.getLogger(__name__).exception("unhandled_exception", exc_info=exc)
-        return JSONResponse(500, {"error": {"code": "INTERNAL_ERROR", "message": "Internal server error", "details": {}}, "request_id": getattr(request.state, "request_id", None)})
+        return JSONResponse({"error": {"code": "INTERNAL_ERROR", "message": "Internal server error", "details": {}}, "request_id": getattr(request.state, "request_id", None)}, status_code=500)
     app.add_exception_handler(AppError, app_error); app.add_exception_handler(RequestValidationError, validation)
     app.add_exception_handler(Exception, unexpected)
