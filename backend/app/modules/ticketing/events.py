@@ -6,3 +6,4 @@ class InMemoryEventBus:
     async def publish(self, event_type: str, payload: dict):
         event={"type":event_type,"payload":payload}; self.events.append(event); await self.queue.put(event)
     async def consume(self): return await self.queue.get()
+event_bus = InMemoryEventBus()
