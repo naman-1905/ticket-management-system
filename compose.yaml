@@ -1,21 +1,24 @@
 services:
   postgres:
+    profiles: [local]
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: ticketing
-      POSTGRES_PASSWORD: ticketing
-      POSTGRES_DB: ticketing
+      POSTGRES_USER: ${POSTGRES_USER:-ticketing}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ticketing}
+      POSTGRES_DB: ${POSTGRES_DB:-ticketing}
     ports: ["5432:5432"]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ticketing -d ticketing"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
   redis:
+    profiles: [local]
     image: redis:7-alpine
     ports: ["6379:6379"]
     healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 10 }
   rabbitmq:
+    profiles: [local]
     image: rabbitmq:3-management-alpine
     ports: ["5672:5672", "15672:15672"]
     healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 10s, timeout: 5s, retries: 10 }
@@ -27,7 +30,7 @@ services:
     container_name: ticketing-backend
 
     ports:
-      - "8001:8000"
+      - "8000:8000"
 
     env_file:
       - .env
@@ -35,14 +38,4 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-    networks:
-      - default
-      - naman-private-network
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-      rabbitmq: { condition: service_healthy }
-
-networks:
-  naman-private-network:
-    external: true
+    restart: unless-stopped
