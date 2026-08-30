@@ -6,7 +6,7 @@ pipeline {
     FRONTEND_IMAGE = "ticket-fe:latest"
     BACKEND_IMAGE  = "ticket-be:latest"
     COMPOSE_FILE   = "docker-compose.yml"
-    NEXT_PUBLIC_API_URL = "https://namanchaturvedi.com/ticket-backend/api/v1"
+    NEXT_PUBLIC_API_URL="https://ticket-be.namanchaturvedi.com/api/v1"
 }
 
     stages {
