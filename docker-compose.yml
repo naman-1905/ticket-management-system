@@ -1,0 +1,40 @@
+services:
+
+  backend:
+    image: ticket-backend:latest
+    container_name: ticket-backend
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    expose:
+      - "8000"
+    networks:
+      - ticket-network
+
+  frontend:
+    image: ticket-frontend:latest
+    container_name: ticket-frontend
+    restart: unless-stopped
+    expose:
+      - "3000"
+    depends_on:
+      - backend
+    networks:
+      - ticket-network
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ticket-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    volumes:
+      - ./cloudflared:/etc/cloudflared:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - ticket-network
+
+networks:
+  ticket-network:
+    driver: bridge
