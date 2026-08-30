@@ -1,247 +1,789 @@
-# Ticket Management System — Backend API Reference
+# Ticket Management System
 
-FastAPI backend. All module routers are mounted under `/api/v1`. Interactive docs: `GET /docs` (Swagger UI) and `GET /openapi.json`.
+A full-stack ticket management system built with **Next.js** and **FastAPI**, using **PostgreSQL** as the only backend infrastructure dependency.
 
-## Conventions
+## Architecture
 
-- **Base URL:** `http://localhost:<port>/api/v1`
-- **Auth:** Bearer JWT access token in the header — `Authorization: Bearer <access_token>` (obtained from `/auth/login` or `/auth/register`). Roles: `CUSTOMER`, `AGENT`, `ADMIN`.
-- **Idempotency:** `POST /tickets` and `POST /tickets/{id}/comments` accept an optional `Idempotency-Key` header; replays return the cached response.
-- **Pagination:** list endpoints use query params `page` (≥1, default 1) and `size` (1–100, default 20), returning `{ items, total, page, size }`.
+```text
+┌──────────────────────────────┐
+│          Frontend            │
+│          Next.js             │
+│        localhost:3000        │
+└──────────────┬───────────────┘
+               │ HTTP/REST
+               ▼
+┌──────────────────────────────┐
+│           Backend            │
+│           FastAPI            │
+│        localhost:8000        │
+└──────────────┬───────────────┘
+               │ PostgreSQL
+               ▼
+┌──────────────────────────────┐
+│         PostgreSQL           │
+│        192.168.1.38:5432     │
+│        Database: ticketing_db│
+└──────────────────────────────┘
+```
 
-### Error format (all errors)
+## Project Structure
+
+```text
+ticket-management-system/
+│
+├── backend/
+│   ├── .venv/
+│   ├── .env
+│   ├── requirements.txt
+│   ├── README.md
+│   │
+│   └── app/
+│       ├── __init__.py
+│       ├── config.py
+│       ├── db.py
+│       ├── deps.py
+│       ├── main.py
+│       ├── models.py
+│       ├── schemas.py
+│       ├── security.py
+│       ├── utils.py
+│       │
+│       └── routers/
+│           ├── __init__.py
+│           ├── auth.py
+│           ├── users.py
+│           ├── tickets.py
+│           ├── sla.py
+│           └── audit.py
+│
+├── frontend/
+│   ├── app/
+│   ├── lib/
+│   ├── public/
+│   ├── package.json
+│   └── ...
+│
+├── compose.yaml
+├── Jenkinsfile
+├── start.bat
+├── start.sh
+└── README.md
+```
+
+## Technology Stack
+
+### Frontend
+
+* Next.js
+* React
+* JavaScript
+* Next.js App Router
+
+### Backend
+
+* FastAPI
+* Python
+* SQLAlchemy 2
+* asyncpg
+* Pydantic
+* JWT authentication
+* Argon2 password hashing
+
+### Database
+
+* PostgreSQL 18
+* Database: `ticketing_db`
+* Host: `192.168.1.38`
+* Port: `5432`
+* User: `naman`
+
+### Infrastructure
+
+The backend intentionally uses PostgreSQL as its only external infrastructure dependency.
+
+Not used:
+
+* Redis
+* RabbitMQ
+* Celery
+* Kafka
+* Prometheus
+* Alembic
+
+Database tables are created automatically by SQLAlchemy when the backend starts.
+
+---
+
+# Backend
+
+## Requirements
+
+* Python 3.12+
+* PostgreSQL
+* PostgreSQL must be reachable from the development machine on port `5432`
+
+## Backend Setup
+
+From the project root:
+
+```cmd
+cd backend
+```
+
+Create the virtual environment:
+
+```cmd
+python -m venv .venv
+```
+
+Activate it in Windows CMD:
+
+```cmd
+.venv\Scripts\activate.bat
+```
+
+Verify Python:
+
+```cmd
+where python
+```
+
+The first result should be:
+
+```text
+D:\Projects\ticket-management-system\backend\.venv\Scripts\python.exe
+```
+
+Install dependencies:
+
+```cmd
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+## Backend Environment
+
+Create:
+
+```text
+backend/.env
+```
+
+Example:
+
+```env
+DATABASE_URL=postgresql+asyncpg://naman:YOUR_PASSWORD@192.168.1.38:5432/ticketing_db
+
+JWT_SECRET_KEY=YOUR_GENERATED_SECRET
+
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=30
+
+APP_VERSION=1.0.0
+```
+
+Do not commit `.env`.
+
+The PostgreSQL password and JWT secret must never be committed to source control.
+
+## Generate JWT Secret
+
+Generate a strong secret with:
+
+```cmd
+python -c "import secrets; print(secrets.token_urlsafe(64))"
+```
+
+Copy the generated value into:
+
+```env
+JWT_SECRET_KEY=...
+```
+
+## Verify Database Configuration
+
+Run:
+
+```cmd
+python -c "from app.config import settings; from sqlalchemy.engine import make_url; u=make_url(settings.database_url); print('driver:',u.drivername); print('host:',u.host); print('port:',u.port); print('database:',u.database); print('username:',u.username)"
+```
+
+Expected:
+
+```text
+driver: postgresql+asyncpg
+host: 192.168.1.38
+port: 5432
+database: ticketing_db
+username: naman
+```
+
+## Test PostgreSQL Connectivity
+
+From Windows:
+
+```cmd
+powershell -Command "Test-NetConnection 192.168.1.38 -Port 5432"
+```
+
+Expected:
+
+```text
+TcpTestSucceeded : True
+```
+
+## Start Backend
+
+```cmd
+cd backend
+.venv\Scripts\activate.bat
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Backend:
+
+```text
+http://localhost:8000
+```
+
+Swagger UI:
+
+```text
+http://localhost:8000/docs
+```
+
+OpenAPI:
+
+```text
+http://localhost:8000/openapi.json
+```
+
+---
+
+# Frontend
+
+## Requirements
+
+* Node.js
+* npm
+
+## Install Dependencies
+
+```cmd
+cd frontend
+npm install
+```
+
+## Start Development Server
+
+```cmd
+npm run dev
+```
+
+Frontend:
+
+```text
+http://localhost:3000
+```
+
+The frontend API URL should point to the FastAPI backend.
+
+Example:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+```
+
+---
+
+# Start Everything
+
+## Windows
+
+The project contains:
+
+```text
+start.bat
+```
+
+Run from the project root:
+
+```cmd
+start.bat
+```
+
+This starts:
+
+```text
+Frontend → http://localhost:3000
+Backend  → http://localhost:8000
+```
+
+The backend and frontend run in separate terminal windows so their logs remain independent.
+
+## WSL / Linux
+
+The project also contains:
+
+```text
+start.sh
+```
+
+Make it executable:
+
+```bash
+chmod +x start.sh
+```
+
+Run:
+
+```bash
+./start.sh
+```
+
+---
+
+# API
+
+All versioned API routes use:
+
+```text
+/api/v1
+```
+
+## Root & Health
+
+| Method | Endpoint               | Auth | Purpose                   |
+| ------ | ---------------------- | ---- | ------------------------- |
+| GET    | `/`                    | —    | Service banner            |
+| GET    | `/healthz`             | —    | Liveness + database state |
+| GET    | `/health`              | —    | Liveness + database state |
+| GET    | `/health/db`           | —    | Database health           |
+| GET    | `/api/v1/meta/version` | —    | Application version       |
+
+## Authentication
+
+| Method | Endpoint                | Auth   |
+| ------ | ----------------------- | ------ |
+| POST   | `/api/v1/auth/register` | Public |
+| POST   | `/api/v1/auth/login`    | Public |
+| POST   | `/api/v1/auth/refresh`  | Public |
+| POST   | `/api/v1/auth/logout`   | Bearer |
+| GET    | `/api/v1/auth/me`       | Bearer |
+
+Authentication uses:
+
+```text
+Authorization: Bearer <access_token>
+```
+
+Roles:
+
+```text
+CUSTOMER
+AGENT
+ADMIN
+```
+
+## Users
+
+| Method | Endpoint                       | Roles        |
+| ------ | ------------------------------ | ------------ |
+| GET    | `/api/v1/users`                | AGENT, ADMIN |
+| PATCH  | `/api/v1/users/{user_id}/role` | ADMIN        |
+
+## Tickets
+
+| Method | Endpoint                               | Roles                  |
+| ------ | -------------------------------------- | ---------------------- |
+| POST   | `/api/v1/tickets`                      | Any authenticated user |
+| GET    | `/api/v1/tickets`                      | Any authenticated user |
+| GET    | `/api/v1/tickets/{ticket_id}`          | Any authenticated user |
+| PATCH  | `/api/v1/tickets/{ticket_id}/status`   | Authenticated          |
+| POST   | `/api/v1/tickets/{ticket_id}/assign`   | AGENT, ADMIN           |
+| GET    | `/api/v1/tickets/{ticket_id}/comments` | Authenticated          |
+| POST   | `/api/v1/tickets/{ticket_id}/comments` | Authenticated          |
+| GET    | `/api/v1/tickets/{ticket_id}/sla`      | Authenticated          |
+
+Customers are restricted to their own tickets.
+
+Agents and administrators can work with tickets across customers.
+
+## SLA
+
+| Method | Endpoint                           | Roles        |
+| ------ | ---------------------------------- | ------------ |
+| GET    | `/api/v1/sla/policies`             | AGENT, ADMIN |
+| POST   | `/api/v1/sla/policies`             | ADMIN        |
+| PATCH  | `/api/v1/sla/policies/{policy_id}` | ADMIN        |
+
+## Audit
+
+| Method | Endpoint             | Roles |
+| ------ | -------------------- | ----- |
+| GET    | `/api/v1/audit/logs` | ADMIN |
+
+---
+
+# Authentication Flow
+
+## Register
+
+```http
+POST /api/v1/auth/register
+```
 
 ```json
 {
-  "error": { "code": "NOT_FOUND", "message": "Resource not found", "details": {} },
+  "email": "user@example.com",
+  "full_name": "Jane Doe",
+  "password": "min-8-chars"
+}
+```
+
+Returns:
+
+```json
+{
+  "access_token": "<jwt>",
+  "refresh_token": "<opaque>",
+  "token_type": "bearer"
+}
+```
+
+The first registered account becomes `ADMIN`.
+
+Subsequent accounts default to `CUSTOMER`.
+
+## Login
+
+```http
+POST /api/v1/auth/login
+```
+
+```json
+{
+  "email": "user@example.com",
+  "password": "password"
+}
+```
+
+## Refresh
+
+```http
+POST /api/v1/auth/refresh
+```
+
+```json
+{
+  "refresh_token": "<opaque>"
+}
+```
+
+Refresh tokens are rotated.
+
+Reusing an already-revoked refresh token revokes the entire token family.
+
+## Current User
+
+```http
+GET /api/v1/auth/me
+Authorization: Bearer <access_token>
+```
+
+---
+
+# Ticket Lifecycle
+
+Ticket statuses:
+
+```text
+OPEN
+IN_PROGRESS
+ON_HOLD
+RESOLVED
+CLOSED
+```
+
+Transitions are controlled by the caller's role.
+
+The backend validates status changes before updating the ticket.
+
+Status changes are audited.
+
+---
+
+# SLA
+
+When a ticket is created, the backend searches for an active SLA policy matching the ticket priority.
+
+Priorities:
+
+```text
+P1
+P2
+P3
+P4
+```
+
+The matching policy is attached to the ticket.
+
+SLA tracking includes:
+
+```text
+first_response_due_at
+resolution_due_at
+first_responded_at
+resolved_at
+breached_at
+status
+```
+
+---
+
+# Idempotency
+
+The following endpoints support an optional:
+
+```http
+Idempotency-Key: <unique-key>
+```
+
+Supported endpoints:
+
+```text
+POST /api/v1/tickets
+POST /api/v1/tickets/{ticket_id}/comments
+```
+
+Idempotency records are stored in PostgreSQL.
+
+Repeated requests using the same key for the same user and endpoint return the previously stored response.
+
+---
+
+# Pagination
+
+List endpoints use:
+
+```text
+page
+size
+```
+
+Defaults:
+
+```text
+page = 1
+size = 20
+```
+
+Maximum:
+
+```text
+size = 100
+```
+
+Example:
+
+```text
+GET /api/v1/tickets?page=1&size=20
+```
+
+Response:
+
+```json
+{
+  "items": [],
+  "total": 0,
+  "page": 1,
+  "size": 20
+}
+```
+
+---
+
+# Error Format
+
+API errors use:
+
+```json
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Resource not found",
+    "details": {}
+  },
   "request_id": "<uuid>"
 }
 ```
 
-| Code | HTTP status | Meaning |
-|---|---|---|
-| `VALIDATION_ERROR` | 422 | Request validation failed (`details.fields` = pydantic errors) |
-| `AUTH_REQUIRED` / `AUTH_INVALID` | 401 | Missing/invalid/expired token, bad credentials |
-| `REFRESH_TOKEN_REUSE` | 401 | Refresh-token reuse detected (whole family revoked) |
-| `FORBIDDEN` | 403 | Insufficient role or resource not owned by user |
-| `NOT_FOUND` | 404 | Resource does not exist |
-| `CONFLICT` | 409 | Duplicate email, last-admin demotion blocked, etc. |
-| `RATE_LIMITED` | 429 | Too many login attempts from the client IP |
-| `INTERNAL_ERROR` | 500 | Unhandled server error |
+Common error codes:
+
+| Code                  | HTTP | Meaning                        |
+| --------------------- | ---: | ------------------------------ |
+| `VALIDATION_ERROR`    |  422 | Request validation failed      |
+| `AUTH_REQUIRED`       |  401 | Authentication required        |
+| `AUTH_INVALID`        |  401 | Invalid or expired credentials |
+| `REFRESH_TOKEN_REUSE` |  401 | Refresh token reuse detected   |
+| `FORBIDDEN`           |  403 | Insufficient permissions       |
+| `NOT_FOUND`           |  404 | Resource does not exist        |
+| `CONFLICT`            |  409 | Resource/state conflict        |
+| `RATE_LIMITED`        |  429 | Rate limit exceeded            |
+| `INTERNAL_ERROR`      |  500 | Unhandled server error         |
 
 ---
 
-## Root & Health (no auth)
+# Database
 
-### `GET /`
-Service banner. → `{"message": "Ticket Management System Backend is running"}`
+PostgreSQL is the sole persistence and infrastructure dependency.
 
-### `GET /healthz` · `GET /health`
-→ `{"status": "ok", "db": "up|down"}`
+The backend uses:
 
-### `GET /health/db`
-→ `{"status": "healthy" | "unhealthy"}`
+```text
+SQLAlchemy 2
+asyncpg
+```
 
-### `GET /api/v1/meta/version`
-→ `{"version": "<app_version>", "git_sha": "unknown"}`
+Connection format:
+
+```text
+postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DATABASE
+```
+
+Current development database:
+
+```text
+Host:     192.168.1.38
+Port:     5432
+Database: ticketing_db
+User:     naman
+```
+
+Tables are created automatically at application startup.
+
+There is intentionally no Alembic migration layer.
 
 ---
 
-## Auth — `/api/v1/auth` (tag: `auth`)
+# Security
 
-### `POST /api/v1/auth/register` → 201
-Create an account; returns a token pair. Rate-limited per IP like login.
+## Passwords
 
-**Body:**
-```json
-{ "email": "user@example.com", "full_name": "Jane Doe", "password": "min-8-chars" }
+Passwords are never stored in plaintext.
+
+They are hashed using Argon2 through `pwdlib`.
+
+## Access Tokens
+
+Access tokens are JWTs.
+
+They contain:
+
+```text
+sub
+role
+type
+exp
 ```
-(`full_name` 1–200 chars, `password` ≥ 8 chars)
 
-**Response (TokenOut):**
-```json
-{ "access_token": "<jwt>", "refresh_token": "<opaque>", "token_type": "bearer" }
+## Refresh Tokens
+
+Refresh tokens are opaque random values.
+
+Only their hashes are persisted in PostgreSQL.
+
+Refresh-token rotation is enforced.
+
+Refresh-token reuse revokes the complete token family.
+
+## Secrets
+
+Never commit:
+
+```text
+.env
 ```
-Errors: `409 CONFLICT` email already registered.
 
-### `POST /api/v1/auth/login` → 200
-**Body:** `{ "email": "...", "password": "..." }`
-**Response (TokenOut):** as above.
-Errors: `401 AUTH_INVALID`, `429 RATE_LIMITED`.
+to Git.
 
-### `POST /api/v1/auth/refresh` → 200
-Rotate the refresh token (old one revoked; reuse revokes the whole family).
-**Body:** `{ "refresh_token": "<opaque>" }`
-**Response (TokenOut):** as above. Errors: `401 AUTH_REQUIRED`, `401 REFRESH_TOKEN_REUSE`.
+Use:
 
-### `POST /api/v1/auth/logout` → 204
-Requires Bearer token. Revokes the given refresh token for the current user.
-**Body:** `{ "refresh_token": "<opaque>" }` — no response body.
-
-### `GET /api/v1/auth/me` → 200
-Requires Bearer token (any role). Returns the current user.
-**Response (UserOut):**
-```json
-{ "id": "<uuid>", "email": "...", "full_name": "...", "role": "CUSTOMER|AGENT|ADMIN", "is_active": true }
+```text
+.env.example
 ```
+
+for configuration documentation and placeholders.
 
 ---
 
-## Users — `/api/v1/users` (tag: `users`)
+# Development Commands
 
-### `GET /api/v1/users` → 200
-Requires role **AGENT or ADMIN**. Lists users ordered by email.
-**Query:** `role` (optional, filter by `CUSTOMER|AGENT|ADMIN`).
-**Response:** array of full user rows (DB model):
-```json
-[ { "id": "<uuid>", "email": "...", "full_name": "...", "password_hash": "...", "role": "...", "is_active": true, "created_at": "<iso8601>" } ]
+## Backend
+
+Activate environment:
+
+```cmd
+cd backend
+.venv\Scripts\activate.bat
 ```
 
-### `PATCH /api/v1/users/{user_id}/role` → 200
-Requires role **ADMIN**. Change a user's role.
-**Path:** `user_id` (UUID). **Body:** `{ "role": "CUSTOMER|AGENT|ADMIN" }`
-**Response:** updated full user row (as above).
-Errors: `404 NOT_FOUND`, `409 CONFLICT` ("Cannot demote the last active administrator").
+Run:
 
----
-
-## Tickets — `/api/v1/tickets` (tag: `tickets`)
-
-All endpoints require a Bearer token. Customers only see their own tickets (`customer_id == user.id`).
-
-### `POST /api/v1/tickets` → 201
-Create a ticket (any role; `customer_id`/`created_by` = caller). An active SLA policy matching the priority is attached automatically, and a `ticket.created` event is published.
-**Header:** optional `Idempotency-Key`.
-**Body (TicketCreate):**
-```json
-{ "title": "...", "description": "...", "priority": "P1|P2|P3|P4", "category": "optional, ≤50 chars" }
-```
-(`title` 1–300, `description` ≥ 1 char, `priority` default `"P3"`)
-
-**Response (TicketOut):**
-```json
-{
-  "id": "<uuid>", "ticket_number": "TCK-<12 hex uppercase>",
-  "title": "...", "description": "...",
-  "status": "OPEN|IN_PROGRESS|ON_HOLD|RESOLVED|CLOSED",
-  "priority": "P3", "category": null,
-  "customer_id": "<uuid>", "assignee_id": null,
-  "created_at": "<iso8601>"
-}
+```cmd
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-### `GET /api/v1/tickets` → 200
-List tickets (newest first). Customers are scoped to their own; AGENT/ADMIN may filter by any customer.
-**Query:** `page`, `size`, plus optional filters `status`, `priority`, `category`, `customer_id` (UUID), `assignee_id` (UUID).
-**Response:** `{ "items": [TicketOut...], "total": 42, "page": 1, "size": 20 }`
+Install dependencies:
 
-### `GET /api/v1/tickets/{ticket_id}` → 200
-Fetch one ticket. **Path:** `ticket_id` (UUID).
-**Response (TicketOut):** as above. Errors: `404 NOT_FOUND`, `403 FORBIDDEN`.
-
-### `PATCH /api/v1/tickets/{ticket_id}/status` → 200
-Change status; validated against the state machine for the caller's role, audited, and a `ticket.status_changed` event is published.
-**Body (TicketStatus):** `{ "status": "OPEN|IN_PROGRESS|ON_HOLD|RESOLVED|CLOSED" }`
-**Response (TicketOut).** Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
-
-### `POST /api/v1/tickets/{ticket_id}/assign` → 200
-Requires role **AGENT or ADMIN**. Assign an active agent/admin.
-**Body (Assignment):** `{ "assignee_id": "<uuid>" }`
-**Response (TicketOut).** Errors: `403 FORBIDDEN`, `404 NOT_FOUND` ("Active agent not found").
-
-### `GET /api/v1/tickets/{ticket_id}/comments` → 200
-List comments. Customers only see non-internal ones.
-**Response:** array of CommentOut:
-```json
-[ { "id": "<uuid>", "ticket_id": "<uuid>", "author_id": "<uuid>", "body": "...", "is_internal": false, "created_at": "<iso8601>" } ]
+```cmd
+python -m pip install -r requirements.txt
 ```
 
-### `POST /api/v1/tickets/{ticket_id}/comments` → 201
-Add a comment (audited; `comment.added` event published). Customers cannot create internal comments.
-**Header:** optional `Idempotency-Key`.
-**Body (CommentCreate):** `{ "body": "...", "is_internal": false }`
-**Response (CommentOut).** Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
+## Frontend
 
----
-
-## SLA — tag: `sla`
-
-### `GET /api/v1/sla/policies` → 200
-Requires role **AGENT or ADMIN**. Lists active policies.
-**Response:** array of SLAPolicy rows:
-```json
-[ { "id": "<uuid>", "name": "...", "priority": "P1|P2|P3|P4", "first_response_minutes": 30, "resolution_hours": 8, "is_active": true, "created_at": "<iso8601>", "updated_at": "<iso8601>" } ]
-```
-
-### `POST /api/v1/sla/policies` → 201
-Requires role **ADMIN**. Create a policy.
-**Body (SLAPolicyIn):**
-```json
-{ "name": "...", "priority": "P1|P2|P3|P4", "first_response_minutes": 30, "resolution_hours": 8, "is_active": true }
-```
-(`name` 1–100 unique, `priority` must match `^P[1-4]$`, both durations > 0)
-**Response:** created SLAPolicy row.
-
-### `PATCH /api/v1/sla/policies/{policy_id}` → 200
-Requires role **ADMIN**. Full update of a policy (same body as create).
-**Path:** `policy_id` (UUID). **Response:** updated SLAPolicy row. Errors: `404 NOT_FOUND`.
-
-### `GET /api/v1/tickets/{ticket_id}/sla` → 200
-Requires Bearer token; customers only for their own tickets. Returns the ticket's SLA tracking record, or a pending placeholder if none exists yet.
-**Response (TicketSLA row):**
-```json
-{
-  "id": "<uuid>", "ticket_id": "<uuid>", "policy_id": "<uuid>",
-  "first_response_due_at": "<iso8601|null>", "resolution_due_at": "<iso8601|null>",
-  "first_responded_at": null, "resolved_at": null, "breached_at": null,
-  "status": "ACTIVE"
-}
-```
-or `{ "ticket_id": "<uuid>", "status": "PENDING" }` when no SLA row exists.
-
----
-
-## Audit — `/api/v1/audit` (tag: `audit`)
-
-### `GET /api/v1/audit/logs` → 200
-Requires role **ADMIN**. Paginated audit trail, newest first.
-**Query:** `page`, `size`, plus optional filters `entity_type` (e.g. `"ticket"`), `entity_id` (UUID), `actor_id` (UUID).
-**Response:** `{ "items": [AuditLog...], "total": n, "page": 1, "size": 20 }` where each AuditLog is:
-```json
-{
-  "id": "<uuid>", "actor_id": "<uuid|null>", "action": "ticket.created",
-  "entity_type": "ticket", "entity_id": "<uuid|null>",
-  "old_values": { }, "new_values": { },
-  "correlation_id": null, "created_at": "<iso8601>"
-}
+```cmd
+cd frontend
+npm install
+npm run dev
 ```
 
 ---
 
-## Endpoint summary
+# Production Considerations
 
-| Method | URL | Auth (roles) | Purpose |
-|---|---|---|---|
-| GET | `/` | — | Service banner |
-| GET | `/healthz`, `/health` | — | Liveness + DB state |
-| GET | `/health/db` | — | DB health only |
-| GET | `/api/v1/meta/version` | — | App version |
-| POST | `/api/v1/auth/register` | — (201) | Create account, get tokens |
-| POST | `/api/v1/auth/login` | — | Login, get tokens |
-| POST | `/api/v1/auth/refresh` | — | Rotate refresh token |
-| POST | `/api/v1/auth/logout` | any (204) | Revoke refresh token |
-| GET | `/api/v1/auth/me` | any | Current user profile |
-| GET | `/api/v1/users` | AGENT, ADMIN | List users (`?role=`) |
-| PATCH | `/api/v1/users/{user_id}/role` | ADMIN | Change a user's role |
-| POST | `/api/v1/tickets` | any (201) | Create ticket (+ idempotency key) |
-| GET | `/api/v1/tickets` | any | List/filter tickets (paginated) |
-| GET | `/api/v1/tickets/{ticket_id}` | any | Get one ticket |
-| PATCH | `/api/v1/tickets/{ticket_id}/status` | any | Change status (state machine) |
-| POST | `/api/v1/tickets/{ticket_id}/assign` | AGENT, ADMIN | Assign an agent |
-| GET | `/api/v1/tickets/{ticket_id}/comments` | any | List comments |
-| POST | `/api/v1/tickets/{ticket_id}/comments` | any (201) | Add comment (+ idempotency key) |
-| GET | `/api/v1/sla/policies` | AGENT, ADMIN | List active SLA policies |
-| POST | `/api/v1/sla/policies` | ADMIN (201) | Create SLA policy |
-| PATCH | `/api/v1/sla/policies/{policy_id}` | ADMIN | Update SLA policy |
-| GET | `/api/v1/tickets/{ticket_id}/sla` | any | Ticket's SLA tracking record |
-| GET | `/api/v1/audit/logs` | ADMIN | Paginated audit log (filters) |
+Before production deployment:
+
+* Use a production-grade PostgreSQL instance.
+* Use a strong randomly generated `JWT_SECRET_KEY`.
+* Store secrets in environment variables or a secrets manager.
+* Do not expose PostgreSQL directly to the public internet.
+* Restrict PostgreSQL access to trusted application hosts.
+* Use HTTPS.
+* Configure CORS explicitly for production frontend origins.
+* Run FastAPI behind a production reverse proxy.
+* Use a process manager/container orchestration strategy appropriate for deployment.
+* Establish a real database migration strategy before making schema changes in production.
+
+The current automatic `create_all()` approach is intended for the current development architecture and deliberately replaces Alembic because this project currently requires PostgreSQL-only infrastructure with no migration service.
+
+---
+
+# Current Development URLs
+
+```text
+Frontend
+http://localhost:3000
+
+Backend
+http://localhost:8000
+
+Swagger
+http://localhost:8000/docs
+
+OpenAPI
+http://localhost:8000/openapi.json
+
+PostgreSQL
+192.168.1.38:5432
+```
