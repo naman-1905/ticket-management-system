@@ -39,40 +39,32 @@ pipeline {
         }
 
         stage('Deploy') {
-            steps {
-                withCredentials([
-                    string(
-                        credentialsId: 'ticket-env',
-                        variable: 'TICKET_ENV'
-                    )
-                ]) {
-                    sh '''
-                        set -e
+    steps {
+        withCredentials([
+            file(
+                credentialsId: 'ticket-env',
+                variable: 'TICKET_ENV_FILE'
+            )
+        ]) {
+            sh '''
+                set -e
 
-                        printf '%s\\n' "$TICKET_ENV" > .env
+                cp "$TICKET_ENV_FILE" .env
 
-                        echo "=== ENV lines ==="
-                        wc -l .env
+                echo "=== ENV keys ==="
+                sed 's/=.*$/=<REDACTED>/' .env
 
-                        echo "=== ENV keys ==="
-                        sed 's/=.*$/=<REDACTED>/' .env
+                echo "=== Deploying ==="
+                docker compose \
+                    -f ${COMPOSE_FILE} \
+                    up -d \
+                    --force-recreate
 
-                        echo "=== Compose config ==="
-                        docker compose \
-                            -f ${COMPOSE_FILE} \
-                            config
-
-                        echo "=== Deploying ==="
-                        docker compose \
-                            -f ${COMPOSE_FILE} \
-                            up -d \
-                            --force-recreate
-
-                        rm -f .env
-                    '''
-                }
-            }
+                rm -f .env
+            '''
         }
+    }
+}
 
         stage('Verify') {
             steps {
