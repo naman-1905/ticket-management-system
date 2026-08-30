@@ -3,11 +3,11 @@ pipeline {
     agent any
 
     environment {
-    FRONTEND_IMAGE = "ticket-fe:latest"
-    BACKEND_IMAGE  = "ticket-be:latest"
-    COMPOSE_FILE   = "docker-compose.yml"
-    NEXT_PUBLIC_API_URL="https://ticket-be.namanchaturvedi.com/api/v1"
-}
+        FRONTEND_IMAGE    = "ticket-fe:latest"
+        BACKEND_IMAGE     = "ticket-be:latest"
+        COMPOSE_FILE      = "docker-compose.yml"
+        NEXT_PUBLIC_API_URL = "https://ticket-be.namanchaturvedi.com/api/v1"
+    }
 
     stages {
 
@@ -27,55 +27,74 @@ pipeline {
             }
         }
 
-stage('Build Frontend') {
-    steps {
-        sh '''
-            docker build \
-                --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}" \
-                -t ${FRONTEND_IMAGE} \
-                ./frontend
-        '''
-    }
-}
-
-    stage('Deploy') {
-        steps {
-            withCredentials([
-                file(
-                    credentialsId: 'ticket-env',
-                    variable: 'TICKET_ENV_FILE'
-                )
-            ]) {
+        stage('Build Frontend') {
+            steps {
                 sh '''
-                    cp "$TICKET_ENV_FILE" .env
-
-                    docker compose \
-                        -f ${COMPOSE_FILE} \
-                        up -d \
-                        --force-recreate
-
-                    rm -f .env
+                    docker build \
+                        --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}" \
+                        -t ${FRONTEND_IMAGE} \
+                        ./frontend
                 '''
             }
         }
-    }
+
+        stage('Deploy') {
+            steps {
+                withCredentials([
+                    string(
+                        credentialsId: 'ticket-env',
+                        variable: 'TICKET_ENV'
+                    )
+                ]) {
+                    sh '''
+                        printf '%s\\n' "$TICKET_ENV" > .env
+
+                        docker compose \
+                            -f ${COMPOSE_FILE} \
+                            up -d \
+                            --force-recreate
+
+                        rm -f .env
+                    '''
+                }
+            }
+        }
 
         stage('Verify') {
             steps {
                 sh '''
-                    sleep 5
+                    sleep 10
 
+                    echo "=== Containers ==="
                     docker ps
 
-                    echo "Backend:"
-                    docker inspect \
+                    echo "=== Backend status ==="
+                    BACKEND_STATUS=$(docker inspect \
                         --format='{{.State.Status}}' \
-                        ticket-be
+                        ticket-be)
 
-                    echo "Frontend:"
-                    docker inspect \
+                    echo "$BACKEND_STATUS"
+
+                    if [ "$BACKEND_STATUS" != "running" ]; then
+                        echo "Backend is not running."
+                        docker logs --tail 100 ticket-be
+                        exit 1
+                    fi
+
+                    echo "=== Frontend status ==="
+                    FRONTEND_STATUS=$(docker inspect \
                         --format='{{.State.Status}}' \
-                        ticket-fe
+                        ticket-fe)
+
+                    echo "$FRONTEND_STATUS"
+
+                    if [ "$FRONTEND_STATUS" != "running" ]; then
+                        echo "Frontend is not running."
+                        docker logs --tail 100 ticket-fe
+                        exit 1
+                    fi
+
+                    echo "Deployment verification passed."
                 '''
             }
         }
@@ -99,4 +118,3 @@ stage('Build Frontend') {
         }
     }
 }
-
