@@ -1,36 +1,73 @@
-import uuid, traceback
+import uuid
+import traceback
+
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
+
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+
 from sqlalchemy import text
+
 from .db import engine, Base
 from . import models
 from .routers import auth, users, tickets, sla, audit
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
     yield
+
     await engine.dispose()
 
-app = FastAPI(title="Ticket Management System Backend", version="1.0.0", lifespan=lifespan)
+
+app = FastAPI(
+    title="Ticket Management System Backend",
+    version="1.0.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://100.104.230.57:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.middleware("http")
 async def request_context(request: Request, call_next):
     request.state.request_id = str(uuid.uuid4())
+
     try:
         response = await call_next(request)
         response.headers["X-Request-ID"] = request.state.request_id
         return response
+
     except Exception:
         traceback.print_exc()
-        return JSONResponse(status_code=500, content={
-            "error":{"code":"INTERNAL_ERROR","message":"Unhandled server error","details":{}},
-            "request_id":request.state.request_id
-        })
 
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": "INTERNAL_ERROR",
+                    "message": "Unhandled server error",
+                    "details": {},
+                },
+                "request_id": request.state.request_id,
+            },
+        )
+    
 @app.exception_handler(Exception)
 async def unhandled(request: Request, exc: Exception):
     traceback.print_exc()
