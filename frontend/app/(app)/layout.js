@@ -1,1 +1,0 @@
-import AuthProvider from '@/components/AuthProvider'; import AuthShell from '@/components/AuthShell'; export default function AppLayout({children}){return <AuthProvider><AuthShell>{children}</AuthShell></AuthProvider>}
