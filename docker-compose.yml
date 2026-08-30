@@ -1,40 +1,40 @@
 services:
 
-  backend:
-    image: ticket-backend:latest
-    container_name: ticket-backend
+  ticket-be:
+    image: ticket-be:latest
+    container_name: ticket-be
     restart: unless-stopped
-    env_file:
-      - ./backend/.env
+
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS}
+      APP_VERSION: ${APP_VERSION}
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
     expose:
       - "8000"
-    networks:
-      - ticket-network
 
-  frontend:
-    image: ticket-frontend:latest
-    container_name: ticket-frontend
+    networks:
+      - naman-private-network
+
+  ticket-fe:
+    image: ticket-fe:latest
+    container_name: ticket-fe
     restart: unless-stopped
+
     expose:
       - "3000"
-    depends_on:
-      - backend
-    networks:
-      - ticket-network
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: ticket-cloudflared
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    volumes:
-      - ./cloudflared:/etc/cloudflared:ro
     depends_on:
-      - frontend
-      - backend
+      - ticket-be
+
     networks:
-      - ticket-network
+      - naman-private-network
 
 networks:
-  ticket-network:
-    driver: bridge
+  naman-private-network:
+    external: true

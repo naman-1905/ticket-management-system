@@ -3,8 +3,8 @@ pipeline {
     agent any
 
     environment {
-        FRONTEND_IMAGE = "ticket-frontend:latest"
-        BACKEND_IMAGE  = "ticket-backend:latest"
+        FRONTEND_IMAGE = "ticket-fe:latest"
+        BACKEND_IMAGE  = "ticket-be:latest"
         COMPOSE_FILE   = "docker-compose.yml"
     }
 
@@ -28,28 +28,44 @@ pipeline {
 
         stage('Build Frontend') {
             steps {
-                sh '''
-                    docker build \
-                        --build-arg NEXT_PUBLIC_API_URL=https://ticket-api.namanchaturvedi.com/api/v1 \
-                        -t ${FRONTEND_IMAGE} \
-                        ./frontend
-                '''
-            }
-        }
+                withCredentials([
+                    string(
+                        credentialsId: 'ticket-env',
+                        variable: 'TICKET_ENV'
+                    )
+                ]) {
+                    sh '''
+                        NEXT_PUBLIC_API_URL=$(printf '%s\\n' "$TICKET_ENV" | \
+                            sed -n 's/^NEXT_PUBLIC_API_URL=//p')
 
-        stage('Stop Existing Containers') {
-            steps {
-                sh '''
-                    docker compose -f ${COMPOSE_FILE} down
-                '''
+                        docker build \
+                            --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
+                            -t ${FRONTEND_IMAGE} \
+                            ./frontend
+                    '''
+                }
             }
         }
 
         stage('Deploy') {
             steps {
-                sh '''
-                    docker compose -f ${COMPOSE_FILE} up -d
-                '''
+                withCredentials([
+                    string(
+                        credentialsId: 'ticket-env',
+                        variable: 'TICKET_ENV'
+                    )
+                ]) {
+                    sh '''
+                        printf '%s\\n' "$TICKET_ENV" > .env
+
+                        docker compose \
+                            -f ${COMPOSE_FILE} \
+                            up -d \
+                            --force-recreate
+
+                        rm -f .env
+                    '''
+                }
             }
         }
 
@@ -61,13 +77,14 @@ pipeline {
                     docker ps
 
                     echo "Backend:"
-                    docker inspect --format='{{.State.Status}}' ticket-backend
+                    docker inspect \
+                        --format='{{.State.Status}}' \
+                        ticket-be
 
                     echo "Frontend:"
-                    docker inspect --format='{{.State.Status}}' ticket-frontend
-
-                    echo "Cloudflared:"
-                    docker inspect --format='{{.State.Status}}' ticket-cloudflared
+                    docker inspect \
+                        --format='{{.State.Status}}' \
+                        ticket-fe
                 '''
             }
         }
@@ -75,18 +92,20 @@ pipeline {
 
     post {
 
+        always {
+            rm -f .env
+            sh '''
+                rm -f .env
+                docker image prune -f
+            '''
+        }
+
         success {
             echo 'Deployment successful.'
         }
 
         failure {
             echo 'Deployment failed.'
-        }
-
-        always {
-            sh '''
-                docker image prune -f
-            '''
         }
     }
 }
