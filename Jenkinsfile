@@ -93,7 +93,6 @@ pipeline {
     post {
 
         always {
-            rm -f .env
             sh '''
                 rm -f .env
                 docker image prune -f
@@ -109,3 +108,4 @@ pipeline {
         }
     }
 }
+
