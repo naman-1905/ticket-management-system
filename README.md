@@ -1,184 +1,247 @@
-# Ticket Management System
+# Ticket Management System — Backend API Reference
 
-Full-stack support ticketing platform with an asynchronous FastAPI backend and a Next.js frontend. It supports customers, agents, and administrators with ticket lifecycle management, comments, SLA tracking, audit logging, JWT authentication, and role-based access control.
+FastAPI backend. All module routers are mounted under `/api/v1`. Interactive docs: `GET /docs` (Swagger UI) and `GET /openapi.json`.
 
-The backend is the current MVP contract. The frontend is being implemented toward the Beacon UX described in [frontend-implementation-plan.md](frontend-implementation-plan.md). Detailed backend behavior is documented in [backend_implementation.md](backend_implementation.md).
+## Conventions
 
-## Product scope
+- **Base URL:** `http://localhost:<port>/api/v1`
+- **Auth:** Bearer JWT access token in the header — `Authorization: Bearer <access_token>` (obtained from `/auth/login` or `/auth/register`). Roles: `CUSTOMER`, `AGENT`, `ADMIN`.
+- **Idempotency:** `POST /tickets` and `POST /tickets/{id}/comments` accept an optional `Idempotency-Key` header; replays return the cached response.
+- **Pagination:** list endpoints use query params `page` (≥1, default 1) and `size` (1–100, default 20), returning `{ items, total, page, size }`.
 
-- Customers create, view, and comment on their own tickets.
-- Agents manage the shared queue, assign tickets, change status, and write public or internal comments.
-- Administrators manage roles, SLA policies, and audit logs.
-- Tickets use the state machine `OPEN → IN_PROGRESS → ON_HOLD → RESOLVED → CLOSED`; the UI should expose only valid transitions.
-- Priorities are `P1` through `P4`, with first-response and resolution deadlines from the active SLA policy.
-- Ticket and comment writes support the optional `Idempotency-Key` header for safe retries.
-- API errors use `{ error: { code, message, details }, request_id }`.
+### Error format (all errors)
 
-## Technology
-
-### Backend
-
-- Python 3.12+, FastAPI, Uvicorn, Pydantic v2
-- SQLAlchemy 2 async ORM with PostgreSQL 16 and psycopg
-- Alembic migrations
-- Argon2 password hashing and PyJWT access/refresh tokens
-- Structured JSON logging, request IDs, and Prometheus HTTP metrics
-- Redis and RabbitMQ configured as infrastructure dependencies
-
-### Frontend
-
-The repository currently contains a JavaScript Next.js application. The target frontend plan specifies Next.js 16 App Router, React 19, TypeScript strict mode, Tailwind CSS v4, shadcn/ui/Radix, Lucide, Motion, Sonner, TanStack Query, Zustand, React Hook Form, Zod, and OpenAPI-generated types. The target test stack is Vitest/Testing Library plus Playwright.
-
-The planned UI is a dense, keyboard-friendly ticket queue with dark/light themes, optimistic ticket/status/assignment/comment updates, ticket details as an intercepted slide-over or shareable full page, a `Cmd/Ctrl+K` command palette, and unmistakable public/internal comment separation.
-
-## Run with Docker Compose
-
-From the repository root:
-
-```powershell
-Copy-Item .env.example .env
-docker compose --profile local up --build
+```json
+{
+  "error": { "code": "NOT_FOUND", "message": "Resource not found", "details": {} },
+  "request_id": "<uuid>"
+}
 ```
 
-On Linux/macOS or Git Bash/WSL:
+| Code | HTTP status | Meaning |
+|---|---|---|
+| `VALIDATION_ERROR` | 422 | Request validation failed (`details.fields` = pydantic errors) |
+| `AUTH_REQUIRED` / `AUTH_INVALID` | 401 | Missing/invalid/expired token, bad credentials |
+| `REFRESH_TOKEN_REUSE` | 401 | Refresh-token reuse detected (whole family revoked) |
+| `FORBIDDEN` | 403 | Insufficient role or resource not owned by user |
+| `NOT_FOUND` | 404 | Resource does not exist |
+| `CONFLICT` | 409 | Duplicate email, last-admin demotion blocked, etc. |
+| `RATE_LIMITED` | 429 | Too many login attempts from the client IP |
+| `INTERNAL_ERROR` | 500 | Unhandled server error |
 
-```bash
-./start.sh
+---
+
+## Root & Health (no auth)
+
+### `GET /`
+Service banner. → `{"message": "Ticket Management System Backend is running"}`
+
+### `GET /healthz` · `GET /health`
+→ `{"status": "ok", "db": "up|down"}`
+
+### `GET /health/db`
+→ `{"status": "healthy" | "unhealthy"}`
+
+### `GET /api/v1/meta/version`
+→ `{"version": "<app_version>", "git_sha": "unknown"}`
+
+---
+
+## Auth — `/api/v1/auth` (tag: `auth`)
+
+### `POST /api/v1/auth/register` → 201
+Create an account; returns a token pair. Rate-limited per IP like login.
+
+**Body:**
+```json
+{ "email": "user@example.com", "full_name": "Jane Doe", "password": "min-8-chars" }
+```
+(`full_name` 1–200 chars, `password` ≥ 8 chars)
+
+**Response (TokenOut):**
+```json
+{ "access_token": "<jwt>", "refresh_token": "<opaque>", "token_type": "bearer" }
+```
+Errors: `409 CONFLICT` email already registered.
+
+### `POST /api/v1/auth/login` → 200
+**Body:** `{ "email": "...", "password": "..." }`
+**Response (TokenOut):** as above.
+Errors: `401 AUTH_INVALID`, `429 RATE_LIMITED`.
+
+### `POST /api/v1/auth/refresh` → 200
+Rotate the refresh token (old one revoked; reuse revokes the whole family).
+**Body:** `{ "refresh_token": "<opaque>" }`
+**Response (TokenOut):** as above. Errors: `401 AUTH_REQUIRED`, `401 REFRESH_TOKEN_REUSE`.
+
+### `POST /api/v1/auth/logout` → 204
+Requires Bearer token. Revokes the given refresh token for the current user.
+**Body:** `{ "refresh_token": "<opaque>" }` — no response body.
+
+### `GET /api/v1/auth/me` → 200
+Requires Bearer token (any role). Returns the current user.
+**Response (UserOut):**
+```json
+{ "id": "<uuid>", "email": "...", "full_name": "...", "role": "CUSTOMER|AGENT|ADMIN", "is_active": true }
 ```
 
-The local profile starts PostgreSQL, Redis, RabbitMQ, the API, and the frontend:
+---
 
-- Frontend: http://localhost:3000
-- API: http://localhost:8000
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-- RabbitMQ management: http://localhost:15672 (`guest` / `guest`)
+## Users — `/api/v1/users` (tag: `users`)
 
-Stop the stack with `docker compose down`. `NEXT_PUBLIC_API_URL` defaults to `http://localhost:8000/api/v1`; set it to the public backend URL for another host. The backend's `CORS_ORIGINS` must include the deployed frontend origin.
-
-## Run the frontend locally
-
-```powershell
-Set-Location frontend
-Copy-Item .env.example .env.local
-npm install
-npm run dev
+### `GET /api/v1/users` → 200
+Requires role **AGENT or ADMIN**. Lists users ordered by email.
+**Query:** `role` (optional, filter by `CUSTOMER|AGENT|ADMIN`).
+**Response:** array of full user rows (DB model):
+```json
+[ { "id": "<uuid>", "email": "...", "full_name": "...", "password_hash": "...", "role": "...", "is_active": true, "created_at": "<iso8601>" } ]
 ```
 
-Open http://localhost:3000. New registrations create `CUSTOMER` accounts. Agents and administrators can be promoted through the backend role endpoint or administrative settings UI.
+### `PATCH /api/v1/users/{user_id}/role` → 200
+Requires role **ADMIN**. Change a user's role.
+**Path:** `user_id` (UUID). **Body:** `{ "role": "CUSTOMER|AGENT|ADMIN" }`
+**Response:** updated full user row (as above).
+Errors: `404 NOT_FOUND`, `409 CONFLICT` ("Cannot demote the last active administrator").
 
-## Run the API locally
+---
 
-Start backing services:
+## Tickets — `/api/v1/tickets` (tag: `tickets`)
 
-```powershell
-docker compose --profile local up -d postgres redis rabbitmq
+All endpoints require a Bearer token. Customers only see their own tickets (`customer_id == user.id`).
+
+### `POST /api/v1/tickets` → 201
+Create a ticket (any role; `customer_id`/`created_by` = caller). An active SLA policy matching the priority is attached automatically, and a `ticket.created` event is published.
+**Header:** optional `Idempotency-Key`.
+**Body (TicketCreate):**
+```json
+{ "title": "...", "description": "...", "priority": "P1|P2|P3|P4", "category": "optional, ≤50 chars" }
+```
+(`title` 1–300, `description` ≥ 1 char, `priority` default `"P3"`)
+
+**Response (TicketOut):**
+```json
+{
+  "id": "<uuid>", "ticket_number": "TCK-<12 hex uppercase>",
+  "title": "...", "description": "...",
+  "status": "OPEN|IN_PROGRESS|ON_HOLD|RESOLVED|CLOSED",
+  "priority": "P3", "category": null,
+  "customer_id": "<uuid>", "assignee_id": null,
+  "created_at": "<iso8601>"
+}
 ```
 
-Create a virtual environment and install dependencies:
+### `GET /api/v1/tickets` → 200
+List tickets (newest first). Customers are scoped to their own; AGENT/ADMIN may filter by any customer.
+**Query:** `page`, `size`, plus optional filters `status`, `priority`, `category`, `customer_id` (UUID), `assignee_id` (UUID).
+**Response:** `{ "items": [TicketOut...], "total": 42, "page": 1, "size": 20 }`
 
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r backend\requirements-dev.txt
-Copy-Item .env.example .env
+### `GET /api/v1/tickets/{ticket_id}` → 200
+Fetch one ticket. **Path:** `ticket_id` (UUID).
+**Response (TicketOut):** as above. Errors: `404 NOT_FOUND`, `403 FORBIDDEN`.
+
+### `PATCH /api/v1/tickets/{ticket_id}/status` → 200
+Change status; validated against the state machine for the caller's role, audited, and a `ticket.status_changed` event is published.
+**Body (TicketStatus):** `{ "status": "OPEN|IN_PROGRESS|ON_HOLD|RESOLVED|CLOSED" }`
+**Response (TicketOut).** Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
+
+### `POST /api/v1/tickets/{ticket_id}/assign` → 200
+Requires role **AGENT or ADMIN**. Assign an active agent/admin.
+**Body (Assignment):** `{ "assignee_id": "<uuid>" }`
+**Response (TicketOut).** Errors: `403 FORBIDDEN`, `404 NOT_FOUND` ("Active agent not found").
+
+### `GET /api/v1/tickets/{ticket_id}/comments` → 200
+List comments. Customers only see non-internal ones.
+**Response:** array of CommentOut:
+```json
+[ { "id": "<uuid>", "ticket_id": "<uuid>", "author_id": "<uuid>", "body": "...", "is_internal": false, "created_at": "<iso8601>" } ]
 ```
 
-For an API running outside Docker, set `POSTGRES_HOST=localhost`, `REDIS_URL=redis://localhost:6379/0`, and `RABBITMQ_URL=amqp://guest:guest@localhost:5672/` in `.env`.
+### `POST /api/v1/tickets/{ticket_id}/comments` → 201
+Add a comment (audited; `comment.added` event published). Customers cannot create internal comments.
+**Header:** optional `Idempotency-Key`.
+**Body (CommentCreate):** `{ "body": "...", "is_internal": false }`
+**Response (CommentOut).** Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
 
-Run the API:
+---
 
-```powershell
-Set-Location backend
-..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+## SLA — tag: `sla`
+
+### `GET /api/v1/sla/policies` → 200
+Requires role **AGENT or ADMIN**. Lists active policies.
+**Response:** array of SLAPolicy rows:
+```json
+[ { "id": "<uuid>", "name": "...", "priority": "P1|P2|P3|P4", "first_response_minutes": 30, "resolution_hours": 8, "is_active": true, "created_at": "<iso8601>", "updated_at": "<iso8601>" } ]
 ```
 
-Development startup creates SQLAlchemy tables automatically. Production deployments must run `alembic upgrade head` first, use `ENVIRONMENT=production`, and provide a randomly generated `JWT_SECRET` of at least 32 characters. Never commit `.env` or production secrets.
+### `POST /api/v1/sla/policies` → 201
+Requires role **ADMIN**. Create a policy.
+**Body (SLAPolicyIn):**
+```json
+{ "name": "...", "priority": "P1|P2|P3|P4", "first_response_minutes": 30, "resolution_hours": 8, "is_active": true }
+```
+(`name` 1–100 unique, `priority` must match `^P[1-4]$`, both durations > 0)
+**Response:** created SLAPolicy row.
 
-## API overview
+### `PATCH /api/v1/sla/policies/{policy_id}` → 200
+Requires role **ADMIN**. Full update of a policy (same body as create).
+**Path:** `policy_id` (UUID). **Response:** updated SLAPolicy row. Errors: `404 NOT_FOUND`.
 
-All versioned endpoints are under `/api/v1`. Protected requests use:
+### `GET /api/v1/tickets/{ticket_id}/sla` → 200
+Requires Bearer token; customers only for their own tickets. Returns the ticket's SLA tracking record, or a pending placeholder if none exists yet.
+**Response (TicketSLA row):**
+```json
+{
+  "id": "<uuid>", "ticket_id": "<uuid>", "policy_id": "<uuid>",
+  "first_response_due_at": "<iso8601|null>", "resolution_due_at": "<iso8601|null>",
+  "first_responded_at": null, "resolved_at": null, "breached_at": null,
+  "status": "ACTIVE"
+}
+```
+or `{ "ticket_id": "<uuid>", "status": "PENDING" }` when no SLA row exists.
 
-```http
-Authorization: Bearer <access_token>
+---
+
+## Audit — `/api/v1/audit` (tag: `audit`)
+
+### `GET /api/v1/audit/logs` → 200
+Requires role **ADMIN**. Paginated audit trail, newest first.
+**Query:** `page`, `size`, plus optional filters `entity_type` (e.g. `"ticket"`), `entity_id` (UUID), `actor_id` (UUID).
+**Response:** `{ "items": [AuditLog...], "total": n, "page": 1, "size": 20 }` where each AuditLog is:
+```json
+{
+  "id": "<uuid>", "actor_id": "<uuid|null>", "action": "ticket.created",
+  "entity_type": "ticket", "entity_id": "<uuid|null>",
+  "old_values": { }, "new_values": { },
+  "correlation_id": null, "created_at": "<iso8601>"
+}
 ```
 
-| Area | Endpoints |
-|---|---|
-| Authentication | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout`; `GET /auth/me` |
-| Tickets | `POST /tickets`, `GET /tickets`, `GET /tickets/{id}`, `PATCH /tickets/{id}/status`, `POST /tickets/{id}/assign` |
-| Comments | `GET/POST /tickets/{id}/comments` |
-| SLA | `GET /sla/policies`, `POST/PATCH /sla/policies`; `GET /tickets/{id}/sla` |
-| Administration | `GET /audit/logs`; `GET /users`; `PATCH /users/{id}/role` |
+---
 
-Access tokens last 15 minutes by default. Refresh tokens rotate and are invalidated on reuse; a frontend refresh failure should clear the session and return to login. Login is rate-limited to five attempts per 60 seconds per client IP by default.
+## Endpoint summary
 
-Operational endpoints include `/healthz`, `/health`, `/health/db`, `/api/v1/meta/version`, `/docs`, and `/redoc`. Responses include `X-Request-ID` and `X-Response-Time-Ms` headers.
-
-## Frontend routes
-
-| Route | Access |
-|---|---|
-| `/login`, `/register` | Public |
-| `/tickets`, `/tickets/new`, `/tickets/[ticketId]` | All authenticated roles; ownership is enforced by the API |
-| `/settings/profile` | All authenticated roles |
-| `/settings/sla` | Agents read; administrators read/write |
-| `/settings/audit-log` | Administrators only |
-| `/settings/members` | Administrators only; role management |
-
-Ticket details open as a slide-over from the queue and as a full page for direct navigation, refreshes, and shared links. The frontend should handle ownership-hidden `404` responses generically so ticket existence is not disclosed.
-
-## First API request
-
-```powershell
-$body = @{ email = "customer@example.com"; full_name = "Example Customer"; password = "change-me-123" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/v1/auth/register -ContentType "application/json" -Body $body
-```
-
-Use the returned access token with Swagger UI's `Authorize` button. Include an `Idempotency-Key` on ticket/comment submissions and preserve `request_id` when reporting failures.
-
-## Tests and quality checks
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-pytest -q
-pytest --cov=backend/app
-ruff check backend/app
-mypy backend/app
-```
-
-Frontend test commands will be added as the planned TypeScript/TanStack Query implementation lands.
-
-## Project layout
-
-```text
-backend/app/
-├── core/                  Configuration, security, errors, logging, idempotency
-├── db/                    Async SQLAlchemy setup
-└── modules/
-    ├── identity/          Registration, login, refresh, users, roles
-    ├── ticketing/         Tickets, status, assignment, comments, events
-    ├── sla/               Policies, deadlines, breach worker
-    ├── audit/             Action history and admin queries
-    └── notifications/     Notification model and consumer boundary
-
-frontend/
-├── app/                   App Router pages and layouts
-├── components/            Auth and ticket UI components
-└── lib/                   API integration
-```
-
-## Current limitations
-
-- Redis is configured, but idempotency and login rate limiting currently use process-local memory.
-- RabbitMQ is configured, but the event bus is currently in memory; events are not durable or shared across API replicas.
-- Notification delivery is not implemented; publishing an event does not guarantee an email or in-app notification.
-- SLA resolution breach monitoring is implemented, but first-response tracking is not automatically completed from comments.
-- User activate/deactivate endpoints are not currently exposed.
-- Ticket responses contain core fields; related profiles, comment counts, and expanded SLA data may require separate requests.
-- The version endpoint returns `git_sha: "unknown"` unless deployment logic supplies a value.
-
-## Deployment
-
-Jenkins supports `PIPELINE_TARGET=frontend`, `backend`, or `both`. Backend deployments run Alembic migrations and health checks; frontend deployments build and recreate only the frontend container. A production host needs Docker Compose, the checked-out repository, environment-specific secrets, and the `Ticket-Backend-Env` Jenkins credential. Configure `CORS_ORIGINS` with the actual frontend origin.
+| Method | URL | Auth (roles) | Purpose |
+|---|---|---|---|
+| GET | `/` | — | Service banner |
+| GET | `/healthz`, `/health` | — | Liveness + DB state |
+| GET | `/health/db` | — | DB health only |
+| GET | `/api/v1/meta/version` | — | App version |
+| POST | `/api/v1/auth/register` | — (201) | Create account, get tokens |
+| POST | `/api/v1/auth/login` | — | Login, get tokens |
+| POST | `/api/v1/auth/refresh` | — | Rotate refresh token |
+| POST | `/api/v1/auth/logout` | any (204) | Revoke refresh token |
+| GET | `/api/v1/auth/me` | any | Current user profile |
+| GET | `/api/v1/users` | AGENT, ADMIN | List users (`?role=`) |
+| PATCH | `/api/v1/users/{user_id}/role` | ADMIN | Change a user's role |
+| POST | `/api/v1/tickets` | any (201) | Create ticket (+ idempotency key) |
+| GET | `/api/v1/tickets` | any | List/filter tickets (paginated) |
+| GET | `/api/v1/tickets/{ticket_id}` | any | Get one ticket |
+| PATCH | `/api/v1/tickets/{ticket_id}/status` | any | Change status (state machine) |
+| POST | `/api/v1/tickets/{ticket_id}/assign` | AGENT, ADMIN | Assign an agent |
+| GET | `/api/v1/tickets/{ticket_id}/comments` | any | List comments |
+| POST | `/api/v1/tickets/{ticket_id}/comments` | any (201) | Add comment (+ idempotency key) |
+| GET | `/api/v1/sla/policies` | AGENT, ADMIN | List active SLA policies |
+| POST | `/api/v1/sla/policies` | ADMIN (201) | Create SLA policy |
+| PATCH | `/api/v1/sla/policies/{policy_id}` | ADMIN | Update SLA policy |
+| GET | `/api/v1/tickets/{ticket_id}/sla` | any | Ticket's SLA tracking record |
+| GET | `/api/v1/audit/logs` | ADMIN | Paginated audit log (filters) |
