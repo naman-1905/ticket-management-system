@@ -3,9 +3,9 @@ pipeline {
     agent any
 
     environment {
-        FRONTEND_IMAGE    = "ticket-fe:latest"
-        BACKEND_IMAGE     = "ticket-be:latest"
-        COMPOSE_FILE      = "docker-compose.yml"
+        FRONTEND_IMAGE      = "ticket-fe:latest"
+        BACKEND_IMAGE       = "ticket-be:latest"
+        COMPOSE_FILE        = "docker-compose.yml"
         NEXT_PUBLIC_API_URL = "https://ticket-be.namanchaturvedi.com/api/v1"
     }
 
@@ -47,8 +47,22 @@ pipeline {
                     )
                 ]) {
                     sh '''
+                        set -e
+
                         printf '%s\\n' "$TICKET_ENV" > .env
 
+                        echo "=== ENV lines ==="
+                        wc -l .env
+
+                        echo "=== ENV keys ==="
+                        sed 's/=.*$/=<REDACTED>/' .env
+
+                        echo "=== Compose config ==="
+                        docker compose \
+                            -f ${COMPOSE_FILE} \
+                            config
+
+                        echo "=== Deploying ==="
                         docker compose \
                             -f ${COMPOSE_FILE} \
                             up -d \
@@ -63,6 +77,8 @@ pipeline {
         stage('Verify') {
             steps {
                 sh '''
+                    set -e
+
                     sleep 10
 
                     echo "=== Containers ==="
@@ -94,7 +110,7 @@ pipeline {
                         exit 1
                     fi
 
-                    echo "Deployment verification passed."
+                    echo "=== Deployment verification passed ==="
                 '''
             }
         }
