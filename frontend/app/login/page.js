@@ -3,7 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { useAuth } from "../../lib/auth-context";
+import AuthLayout from "../components/ui/AuthLayout";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+
+const fieldVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: (i) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.08, duration: 0.3 },
+  }),
+};
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -28,49 +41,50 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="max-w-sm mx-auto px-4 py-16">
-      <h1 className="text-2xl font-semibold mb-1">Welcome back</h1>
-      <p className="text-slate-500 mb-6 text-sm">Log in to manage your tickets.</p>
-
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Log in to manage your tickets."
+      footer={
+        <p className="text-sm text-muted-foreground">
+          No account?{" "}
+          <Link href="/register" className="font-medium text-accent hover:text-accent-hover transition-colors">
+            Register
+          </Link>
+        </p>
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
-          <input
+        <motion.div custom={0} initial="hidden" animate="visible" variants={fieldVariants}>
+          <Input
+            label="Email"
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Password</label>
-          <input
+        </motion.div>
+        <motion.div custom={1} initial="hidden" animate="visible" variants={fieldVariants}>
+          <Input
+            label="Password"
             type="password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
           />
-        </div>
+        </motion.div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-danger">
+            {error}
+          </motion.p>
+        )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full bg-slate-900 text-white rounded-md py-2 text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
-        >
-          {submitting ? "Logging in…" : "Log in"}
-        </button>
+        <motion.div custom={2} initial="hidden" animate="visible" variants={fieldVariants}>
+          <Button type="submit" disabled={submitting} className="w-full">
+            {submitting ? "Logging in…" : "Log in"}
+          </Button>
+        </motion.div>
       </form>
-
-      <p className="text-sm text-slate-500 mt-4">
-        No account?{" "}
-        <Link href="/register" className="text-slate-900 font-medium hover:underline">
-          Register
-        </Link>
-      </p>
-    </div>
+    </AuthLayout>
   );
 }
