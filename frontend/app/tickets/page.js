@@ -2,9 +2,18 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import RequireAuth from "../components/RequireAuth";
 import StatusBadge from "../components/StatusBadge";
 import PriorityBadge from "../components/PriorityBadge";
+import Button from "../components/ui/Button";
+import EmptyState from "../components/ui/EmptyState";
+import PageHeader from "../components/ui/PageHeader";
+import PageTransition from "../components/ui/PageTransition";
+import Pagination from "../components/ui/Pagination";
+import Select from "../components/ui/Select";
+import Spinner from "../components/ui/Spinner";
+import { ListPanel } from "../components/ui/Card";
 import { api } from "../../lib/api";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "ON_HOLD", "RESOLVED", "CLOSED"];
@@ -41,25 +50,25 @@ function TicketsPage() {
   const totalPages = Math.max(1, Math.ceil(total / size));
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">Tickets</h1>
-        <Link
-          href="/tickets/new"
-          className="bg-slate-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-slate-800"
-        >
-          + New ticket
-        </Link>
-      </div>
+    <PageTransition className="mx-auto max-w-5xl px-4 py-8">
+      <PageHeader
+        title="Tickets"
+        description="Track and manage support requests."
+        action={
+          <Link href="/tickets/new">
+            <Button>+ New ticket</Button>
+          </Link>
+        }
+      />
 
-      <div className="flex gap-3 mb-4">
-        <select
+      <div className="mb-4 flex flex-wrap gap-3">
+        <Select
           value={status}
           onChange={(e) => {
             setPage(1);
             setStatus(e.target.value);
           }}
-          className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white"
+          className="rounded-full px-4"
         >
           <option value="">All statuses</option>
           {STATUSES.map((s) => (
@@ -67,14 +76,14 @@ function TicketsPage() {
               {s.replace("_", " ")}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           value={priority}
           onChange={(e) => {
             setPage(1);
             setPriority(e.target.value);
           }}
-          className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white"
+          className="rounded-full px-4"
         >
           <option value="">All priorities</option>
           {PRIORITIES.map((p) => (
@@ -82,58 +91,36 @@ function TicketsPage() {
               {p}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      {error && <p className="mb-4 text-sm text-danger">{error}</p>}
 
       {loading ? (
-        <p className="text-slate-500 text-sm">Loading tickets…</p>
+        <Spinner label="Loading tickets…" />
       ) : items.length === 0 ? (
-        <p className="text-slate-500 text-sm">No tickets found.</p>
+        <EmptyState>No tickets found.</EmptyState>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+        <ListPanel>
           {items.map((t) => (
-            <Link
-              key={t.id}
-              href={`/tickets/${t.id}`}
-              className="flex items-center justify-between px-4 py-3 hover:bg-slate-50"
-            >
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs text-slate-400 font-mono">{t.ticket_number}</span>
-                  <PriorityBadge priority={t.priority} />
+            <motion.div key={t.id} whileHover={{ backgroundColor: "var(--muted)" }} transition={{ duration: 0.15 }}>
+              <Link href={`/tickets/${t.id}`} className="flex items-center justify-between px-4 py-3">
+                <div className="min-w-0">
+                  <div className="mb-0.5 flex items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">{t.ticket_number}</span>
+                    <PriorityBadge priority={t.priority} />
+                  </div>
+                  <p className="truncate font-medium text-foreground">{t.title}</p>
                 </div>
-                <p className="font-medium text-slate-900 truncate">{t.title}</p>
-              </div>
-              <StatusBadge status={t.status} />
-            </Link>
+                <StatusBadge status={t.status} />
+              </Link>
+            </motion.div>
           ))}
-        </div>
+        </ListPanel>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 mt-6 text-sm">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="px-3 py-1 rounded-md border border-slate-300 disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <span className="text-slate-500">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-3 py-1 rounded-md border border-slate-300 disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
-      )}
-    </div>
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+    </PageTransition>
   );
 }
 

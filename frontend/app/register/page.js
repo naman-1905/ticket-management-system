@@ -3,7 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
 import { useAuth } from "../../lib/auth-context";
+import AuthLayout from "../components/ui/AuthLayout";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+
+const fieldVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: (i) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.08, duration: 0.3 },
+  }),
+};
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -29,60 +42,55 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="max-w-sm mx-auto px-4 py-16">
-      <h1 className="text-2xl font-semibold mb-1">Create an account</h1>
-      <p className="text-slate-500 mb-6 text-sm">Get started with the ticket system.</p>
-
+    <AuthLayout
+      title="Create an account"
+      subtitle="Get started with the ticket system."
+      footer={
+        <p className="text-sm text-muted-foreground">
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-accent hover:text-accent-hover transition-colors">
+            Log in
+          </Link>
+        </p>
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">Full name</label>
-          <input
-            required
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
-          <input
+        <motion.div custom={0} initial="hidden" animate="visible" variants={fieldVariants}>
+          <Input label="Full name" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+        </motion.div>
+        <motion.div custom={1} initial="hidden" animate="visible" variants={fieldVariants}>
+          <Input
+            label="Email"
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Password</label>
-          <input
+        </motion.div>
+        <motion.div custom={2} initial="hidden" animate="visible" variants={fieldVariants}>
+          <Input
+            label="Password"
             type="password"
             required
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+            hint="At least 8 characters."
           />
-          <p className="text-xs text-slate-400 mt-1">At least 8 characters.</p>
-        </div>
+        </motion.div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-sm text-danger">
+            {error}
+          </motion.p>
+        )}
 
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full bg-slate-900 text-white rounded-md py-2 text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
-        >
-          {submitting ? "Creating account…" : "Create account"}
-        </button>
+        <motion.div custom={3} initial="hidden" animate="visible" variants={fieldVariants}>
+          <Button type="submit" disabled={submitting} className="w-full">
+            {submitting ? "Creating account…" : "Create account"}
+          </Button>
+        </motion.div>
       </form>
-
-      <p className="text-sm text-slate-500 mt-4">
-        Already have an account?{" "}
-        <Link href="/login" className="text-slate-900 font-medium hover:underline">
-          Log in
-        </Link>
-      </p>
-    </div>
+    </AuthLayout>
   );
 }
