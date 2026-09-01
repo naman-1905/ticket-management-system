@@ -1,23 +1,36 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useAuth } from "../../lib/auth-context";
+import Spinner from "./ui/Spinner";
+import PageTransition from "./ui/PageTransition";
 
-export default function RequireAuth({ roles, children }) {
+export default function RequireAuth({ children, roles }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) router.replace("/login");
-  }, [loading, user, router]);
+    if (loading) return;
+    if (!user) router.replace("/login");
+  }, [user, loading, router]);
 
-  if (loading || !user) {
-    return <div className="max-w-5xl mx-auto px-4 py-10 text-slate-500 text-sm">Loading…</div>;
+  if (loading) {
+    return (
+      <PageTransition className="mx-auto max-w-5xl px-4 py-10">
+        <Spinner />
+      </PageTransition>
+    );
   }
 
+  if (!user) return null;
+
   if (roles && !roles.includes(user.role)) {
-    return <div className="max-w-5xl mx-auto px-4 py-10 text-red-600 text-sm">You don&apos;t have access to this page.</div>;
+    return (
+      <PageTransition className="mx-auto max-w-5xl px-4 py-10">
+        <p className="text-sm text-danger">You don&apos;t have access to this page.</p>
+      </PageTransition>
+    );
   }
 
   return children;
