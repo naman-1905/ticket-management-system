@@ -3,6 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import RequireAuth from "../../components/RequireAuth";
 import { api } from "../../../lib/api";
+import EmptyState from "../../components/ui/EmptyState";
+import PageHeader from "../../components/ui/PageHeader";
+import PageTransition from "../../components/ui/PageTransition";
+import Select from "../../components/ui/Select";
+import Spinner from "../../components/ui/Spinner";
+import { ListPanel } from "../../components/ui/Card";
 
 function UsersPage() {
   const [users, setUsers] = useState([]);
@@ -39,36 +45,37 @@ function UsersPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">Users</h1>
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+    <PageTransition className="mx-auto max-w-3xl px-4 py-8">
+      <PageHeader title="Users" description="Manage roles and access for team members." />
+      {error && <p className="mb-4 text-sm text-danger">{error}</p>}
       {loading ? (
-        <p className="text-slate-500 text-sm">Loading…</p>
+        <Spinner label="Loading users…" />
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+        <ListPanel>
           {users.map((u) => (
-            <div key={u.id} className="px-4 py-3 flex items-center justify-between text-sm">
+            <div key={u.id} className="flex items-center justify-between px-4 py-3 text-sm">
               <div>
-                <p className="font-medium">{u.full_name}</p>
-                <p className="text-slate-500 text-xs">{u.email}</p>
+                <p className="font-medium text-foreground">{u.full_name}</p>
+                <p className="text-xs text-muted-foreground">{u.email}</p>
               </div>
-              <select
+              <Select
                 value={u.role}
                 disabled={updatingId === u.id}
                 onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white"
+                className="rounded-full px-3 py-1.5"
               >
                 {["CUSTOMER", "AGENT", "ADMIN"].map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           ))}
-        </div>
+          {users.length === 0 && <EmptyState>No users found.</EmptyState>}
+        </ListPanel>
       )}
-    </div>
+    </PageTransition>
   );
 }
 
