@@ -302,9 +302,11 @@ class AuditLogOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     actor_id: uuid.UUID | None
+    actor_name: str | None = None
     action: str
     entity_type: str
     entity_id: uuid.UUID | None
+    entity_name: str | None = None
     old_values: dict
     new_values: dict
     correlation_id: str | None
