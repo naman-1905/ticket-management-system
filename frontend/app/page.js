@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../lib/auth-context";
+import Spinner from "./components/ui/Spinner";
+import PageTransition from "./components/ui/PageTransition";
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -13,5 +15,9 @@ export default function Home() {
     router.replace(user ? "/tickets" : "/login");
   }, [user, loading, router]);
 
-  return <div className="max-w-5xl mx-auto px-4 py-10 text-slate-500 text-sm">Loading…</div>;
+  return (
+    <PageTransition className="mx-auto max-w-5xl px-4 py-10">
+      <Spinner />
+    </PageTransition>
+  );
 }
