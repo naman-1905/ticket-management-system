@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import Button from "./Button";
 
 export default function Pagination({ page, totalPages, onPageChange }) {
@@ -12,34 +12,23 @@ export default function Pagination({ page, totalPages, onPageChange }) {
         variant="secondary"
         disabled={page <= 1}
         onClick={() => onPageChange(page - 1)}
-        className="px-3 py-1.5"
+        aria-label="Previous page"
+        className="px-2.5 py-2"
       >
-        Previous
+        <ChevronLeft className="h-4 w-4" strokeWidth={2} />
       </Button>
-      <span className="text-muted-foreground">
+      <span className="min-w-[6rem] text-center text-muted-foreground">
         Page {page} of {totalPages}
       </span>
       <Button
         variant="secondary"
         disabled={page >= totalPages}
         onClick={() => onPageChange(page + 1)}
-        className="px-3 py-1.5"
+        aria-label="Next page"
+        className="px-2.5 py-2"
       >
-        Next
+        <ChevronRight className="h-4 w-4" strokeWidth={2} />
       </Button>
     </div>
-  );
-}
-
-export function AnimatedListRow({ children, className = "", as: Component = motion.div, ...props }) {
-  return (
-    <Component
-      whileHover={{ backgroundColor: "var(--muted)" }}
-      transition={{ duration: 0.15 }}
-      className={`px-4 py-3 ${className}`}
-      {...props}
-    >
-      {children}
-    </Component>
   );
 }
