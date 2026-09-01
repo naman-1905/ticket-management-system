@@ -53,24 +53,30 @@ function UsersPage() {
       ) : (
         <ListPanel>
           {users.map((u) => (
-            <div key={u.id} className="flex items-center justify-between px-4 py-3 text-sm">
-              <div>
-                <p className="font-medium text-foreground">{u.full_name}</p>
-                <p className="text-xs text-muted-foreground">{u.email}</p>
-              </div>
-              <Select
-                value={u.role}
-                disabled={updatingId === u.id}
-                onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                className="rounded-full px-3 py-1.5"
-              >
-                {["CUSTOMER", "CUSTOMER_ADMIN", "AGENT", "SUPERVISOR", "ADMIN", "OWNER"].map((r) => (
+            <div
+            key={u.id}
+            className="flex items-center justify-between border-b border-border/50 px-4 py-3 last:border-0"
+          >
+            <div className="min-w-0">
+              <p className="font-medium text-foreground">{u.full_name}</p>
+              <p className="text-xs text-muted-foreground">{u.email}</p>
+            </div>
+          
+            <Select
+              value={u.role}
+              disabled={updatingId === u.id}
+              onChange={(e) => handleRoleChange(u.id, e.target.value)}
+              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium shadow-none outline-none transition-colors hover:bg-muted focus:ring-2 focus:ring-primary/20"
+            >
+              {["CUSTOMER", "CUSTOMER ADMIN", "AGENT", "SUPERVISOR", "ADMIN", "OWNER"].map(
+                (r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
-                ))}
-              </Select>
-            </div>
+                )
+              )}
+            </Select>
+          </div>
           ))}
           {users.length === 0 && <EmptyState>No users found.</EmptyState>}
         </ListPanel>
