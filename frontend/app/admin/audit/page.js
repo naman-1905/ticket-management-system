@@ -68,7 +68,7 @@ function AuditPage() {
 
 export default function Page() {
   return (
-    <RequireAuth roles={["ADMIN"]}>
+    <RequireAuth permissions={["audit.view"]}>
       <AuditPage />
     </RequireAuth>
   );

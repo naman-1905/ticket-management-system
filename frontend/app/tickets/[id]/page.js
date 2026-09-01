@@ -17,6 +17,8 @@ import { api } from "../../../lib/api";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "ON_HOLD", "RESOLVED", "CLOSED"];
 
+import { hasPermission } from "../../../lib/permissions";
+
 function TicketDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -33,7 +35,8 @@ function TicketDetail() {
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [assigning, setAssigning] = useState(false);
 
-  const canManage = user.role === "AGENT" || user.role === "ADMIN";
+  const canManage = hasPermission(user, "ticket.transition") || hasPermission(user, "ticket.assign");
+  const canInternal = hasPermission(user, "comment.internal.write");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,13 +46,13 @@ function TicketDetail() {
       setTicket(t);
       setComments(c);
       setSla(s);
-      if (canManage) setAgents(await api.listUsers("AGENT"));
+      if (hasPermission(user, "ticket.assign")) setAgents(await api.listAgents());
     } catch (err) {
       setError(err.message || "Failed to load ticket");
     } finally {
       setLoading(false);
     }
-  }, [id, canManage]);
+  }, [id, user]);
 
   useEffect(() => {
     load();
@@ -59,7 +62,10 @@ function TicketDetail() {
     setStatusUpdating(true);
     setError("");
     try {
-      setTicket(await api.updateTicketStatus(id, newStatus));
+      const updated = ticket.allowed_transitions?.length
+        ? await api.transitionTicket(id, newStatus, ticket.version)
+        : await api.updateTicketStatus(id, newStatus);
+      setTicket(updated);
     } catch (err) {
       setError(err.message || "Failed to update status");
     } finally {
@@ -72,7 +78,7 @@ function TicketDetail() {
     setAssigning(true);
     setError("");
     try {
-      setTicket(await api.assignTicket(id, assigneeId));
+      setTicket(await api.assignTicket(id, { assignee_id: assigneeId }));
     } catch (err) {
       setError(err.message || "Failed to assign ticket");
     } finally {
@@ -129,7 +135,7 @@ function TicketDetail() {
         <p className="mb-4 whitespace-pre-wrap text-sm text-muted-foreground">{ticket.description}</p>
 
         <div className="flex flex-wrap items-center gap-4 border-t border-border pt-4 text-sm">
-          {canManage && (
+          {canManage && ticket.allowed_transitions?.length > 0 && (
             <Select
               label="Status"
               value={ticket.status}
@@ -137,15 +143,16 @@ function TicketDetail() {
               onChange={(e) => handleStatusChange(e.target.value)}
               className="rounded-full px-3 py-1.5"
             >
-              {STATUSES.map((s) => (
+              <option value={ticket.status}>{ticket.status.replace(/_/g, " ")}</option>
+              {ticket.allowed_transitions.map((s) => (
                 <option key={s} value={s}>
-                  {s.replace("_", " ")}
+                  {s.replace(/_/g, " ")}
                 </option>
               ))}
             </Select>
           )}
 
-          {canManage && (
+          {hasPermission(user, "ticket.assign") && (
             <Select
               label="Assignee"
               value={ticket.assignee_id || ""}
@@ -206,7 +213,7 @@ function TicketDetail() {
             onChange={(e) => setCommentBody(e.target.value)}
           />
           <div className="flex items-center justify-between">
-            {canManage ? (
+            {canInternal ? (
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input
                   type="checkbox"

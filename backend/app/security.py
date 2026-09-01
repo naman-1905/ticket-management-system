@@ -16,9 +16,12 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return password_hash.verify(password, hashed)
 
-def create_access_token(user_id: uuid.UUID, role: str) -> str:
+def create_access_token(user_id: uuid.UUID, role: str, tenant_id: uuid.UUID | None = None) -> str:
     exp = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
-    return jwt.encode({"sub": str(user_id), "role": role, "type": "access", "exp": exp}, settings.jwt_secret_key, algorithm=ALGORITHM)
+    payload = {"sub": str(user_id), "role": role, "type": "access", "exp": exp}
+    if tenant_id:
+        payload["tenant_id"] = str(tenant_id)
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=ALGORITHM)
 
 def decode_access_token(token: str) -> dict:
     return jwt.decode(token, settings.jwt_secret_key, algorithms=[ALGORITHM])

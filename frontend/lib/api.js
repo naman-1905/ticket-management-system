@@ -29,6 +29,19 @@ export class ApiError extends Error {
   }
 }
 
+function parseError(data, status) {
+  if (data?.error?.code) {
+    return new ApiError(data.error.code, data.error.message || "Request failed", status, data.error.details);
+  }
+  if (data?.detail) {
+    if (typeof data.detail === "object" && data.detail.code) {
+      return new ApiError(data.detail.code, data.detail.message || "Request failed", status, data.detail.details);
+    }
+    return new ApiError("HTTP_ERROR", String(data.detail), status, {});
+  }
+  return new ApiError("UNKNOWN", "Something went wrong", status, {});
+}
+
 function toQueryString(params = {}) {
   const qs = new URLSearchParams(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== "")
@@ -37,7 +50,10 @@ function toQueryString(params = {}) {
 }
 
 async function request(path, { method = "GET", body, headers = {}, auth = true, retry = true } = {}) {
-  const finalHeaders = { "Content-Type": "application/json", ...headers };
+  const finalHeaders = { ...headers };
+  if (!(body instanceof FormData)) {
+    finalHeaders["Content-Type"] = "application/json";
+  }
   if (auth) {
     const token = getAccessToken();
     if (token) finalHeaders["Authorization"] = `Bearer ${token}`;
@@ -46,7 +62,7 @@ async function request(path, { method = "GET", body, headers = {}, auth = true, 
   const res = await fetch(`${API_BASE}${path}`, {
     method,
     headers: finalHeaders,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body instanceof FormData ? body : body !== undefined ? JSON.stringify(body) : undefined,
   });
 
   if (res.status === 204) return null;
@@ -63,8 +79,7 @@ async function request(path, { method = "GET", body, headers = {}, auth = true, 
       const refreshed = await tryRefresh();
       if (refreshed) return request(path, { method, body, headers, auth, retry: false });
     }
-    const err = data?.error || {};
-    throw new ApiError(err.code || "UNKNOWN", err.message || "Something went wrong", res.status, err.details);
+    throw parseError(data, res.status);
   }
 
   return data;
@@ -101,9 +116,11 @@ export const api = {
   me: () => request("/auth/me"),
 
   listUsers: (role) => request(`/users${toQueryString({ role })}`),
+  listAgents: () => request("/users/agents"),
   updateUserRole: (userId, role) => request(`/users/${userId}/role`, { method: "PATCH", body: { role } }),
 
   listTickets: (params = {}) => request(`/tickets${toQueryString(params)}`),
+  searchTickets: (q, params = {}) => request(`/search/tickets${toQueryString({ q, ...params })}`),
   getTicket: (id) => request(`/tickets/${id}`),
   createTicket: (payload, idempotencyKey) =>
     request("/tickets", {
@@ -111,8 +128,11 @@ export const api = {
       body: payload,
       headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {},
     }),
+  transitionTicket: (id, to_status, version) =>
+    request(`/tickets/${id}/transitions`, { method: "POST", body: { to_status, version } }),
   updateTicketStatus: (id, status) => request(`/tickets/${id}/status`, { method: "PATCH", body: { status } }),
-  assignTicket: (id, assignee_id) => request(`/tickets/${id}/assign`, { method: "POST", body: { assignee_id } }),
+  assignTicket: (id, payload) => request(`/tickets/${id}/assign`, { method: "POST", body: payload }),
+  bulkTickets: (payload) => request("/tickets/bulk", { method: "POST", body: payload }),
 
   listComments: (ticketId) => request(`/tickets/${ticketId}/comments`),
   addComment: (ticketId, payload) => request(`/tickets/${ticketId}/comments`, { method: "POST", body: payload }),
@@ -124,6 +144,39 @@ export const api = {
   updateSlaPolicy: (id, payload) => request(`/sla/policies/${id}`, { method: "PATCH", body: payload }),
 
   listAuditLogs: (params = {}) => request(`/audit/logs${toQueryString(params)}`),
+
+  listOrganizations: () => request("/organizations"),
+  createOrganization: (payload) => request("/organizations", { method: "POST", body: payload }),
+
+  listContacts: () => request("/contacts"),
+  createContact: (payload) => request("/contacts", { method: "POST", body: payload }),
+
+  listTeams: () => request("/teams"),
+  createTeam: (payload) => request("/teams", { method: "POST", body: payload }),
+  listQueues: () => request("/queues"),
+  createQueue: (payload) => request("/queues", { method: "POST", body: payload }),
+
+  listNotifications: () => request("/notifications"),
+  markNotificationsRead: () => request("/notifications/read-all", { method: "POST" }),
+
+  reportSummary: () => request("/reports/tickets/summary"),
+
+  listKBArticles: () => request("/kb/articles"),
+  createKBArticle: (payload) => request("/kb/articles", { method: "POST", body: payload }),
+
+  submitCSAT: (ticketId, payload) => request(`/csat/tickets/${ticketId}`, { method: "POST", body: payload }),
+
+  listAttachments: (ticketId) => request(`/attachments/tickets/${ticketId}`),
+  uploadAttachment: (ticketId, file) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request(`/attachments/tickets/${ticketId}`, { method: "POST", body: form });
+  },
+
+  listSavedViews: () => request("/saved-views"),
+  createSavedView: (payload) => request("/saved-views", { method: "POST", body: payload }),
+  listMacros: () => request("/macros"),
+  listTags: () => request("/tags"),
 };
 
 export { setTokens, clearTokens, getAccessToken };

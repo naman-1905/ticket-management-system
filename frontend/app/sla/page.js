@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import RequireAuth from "../components/RequireAuth";
+import { hasPermission } from "../../lib/permissions";
 import { useAuth } from "../../lib/auth-context";
 import { api } from "../../lib/api";
 import Button from "../components/ui/Button";
@@ -94,7 +95,7 @@ function SlaPage() {
         </ListPanel>
       )}
 
-      {user.role === "ADMIN" && (
+      {hasPermission(user, "sla.manage") && (
         <Card>
           <form onSubmit={handleCreate} className="space-y-3">
             <h2 className="text-sm font-medium text-foreground">Create policy</h2>
@@ -136,7 +137,7 @@ function SlaPage() {
 
 export default function Page() {
   return (
-    <RequireAuth roles={["AGENT", "ADMIN"]}>
+    <RequireAuth permissions={["sla.view"]}>
       <SlaPage />
     </RequireAuth>
   );

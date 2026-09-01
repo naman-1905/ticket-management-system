@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "../../lib/auth-context";
+import { homeForUser } from "../../lib/permissions";
 import AuthLayout from "../components/ui/AuthLayout";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -31,8 +32,8 @@ export default function LoginPage() {
     setError("");
     setSubmitting(true);
     try {
-      await login(email, password);
-      router.push("/tickets");
+      const me = await login(email, password);
+      router.push(homeForUser(me));
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {

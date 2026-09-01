@@ -6,7 +6,7 @@ import { useAuth } from "../../lib/auth-context";
 import Spinner from "./ui/Spinner";
 import PageTransition from "./ui/PageTransition";
 
-export default function RequireAuth({ children, roles }) {
+export default function RequireAuth({ children, roles, permissions }) {
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -26,6 +26,14 @@ export default function RequireAuth({ children, roles }) {
   if (!user) return null;
 
   if (roles && !roles.includes(user.role)) {
+    return (
+      <PageTransition className="mx-auto max-w-5xl px-4 py-10">
+        <p className="text-sm text-danger">You don&apos;t have access to this page.</p>
+      </PageTransition>
+    );
+  }
+
+  if (permissions && !permissions.some((p) => user.permissions?.includes(p))) {
     return (
       <PageTransition className="mx-auto max-w-5xl px-4 py-10">
         <p className="text-sm text-danger">You don&apos;t have access to this page.</p>

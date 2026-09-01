@@ -4,6 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../../lib/auth-context";
+import { hasPermission, isStaff } from "../../lib/permissions";
 import BrandMark from "./ui/BrandMark";
 import SettingsMenu from "./ui/SettingsMenu";
 
@@ -35,20 +36,35 @@ export default function Navbar() {
     router.push("/login");
   }
 
-  const links = [{ href: "/tickets", label: "Tickets" }];
-  if (user.role === "AGENT" || user.role === "ADMIN") {
-    links.push({ href: "/sla", label: "SLA Policies" });
+  const staff = isStaff(user);
+  const links = staff
+    ? [
+        { href: "/dashboard", label: "Dashboard" },
+        { href: "/tickets", label: "Tickets" },
+      ]
+    : [
+        { href: "/portal/tickets", label: "My tickets" },
+        { href: "/portal/kb", label: "Help" },
+      ];
+
+  if (staff && hasPermission(user, "sla.view")) {
+    links.push({ href: "/sla", label: "SLA" });
   }
-  if (user.role === "ADMIN") {
+  if (staff && hasPermission(user, "organization.manage")) {
+    links.push({ href: "/customers", label: "Customers" });
+  }
+  if (hasPermission(user, "user.manage")) {
     links.push({ href: "/admin/users", label: "Users" });
-    links.push({ href: "/admin/audit", label: "Audit Log" });
+  }
+  if (hasPermission(user, "audit.view")) {
+    links.push({ href: "/admin/audit", label: "Audit" });
   }
 
   return (
     <header className="sticky top-0 z-20 flex justify-center px-4 py-4">
       <div className="grid w-full max-w-5xl grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[2rem] bg-surface px-4 py-2.5 backdrop-blur-md dark:bg-background">
         <div className="shrink-0">
-          LOGO
+          <BrandMark />
         </div>
 
         <nav className="flex flex-wrap items-center justify-center gap-1.5">

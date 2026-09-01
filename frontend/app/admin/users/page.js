@@ -64,7 +64,7 @@ function UsersPage() {
                 onChange={(e) => handleRoleChange(u.id, e.target.value)}
                 className="rounded-full px-3 py-1.5"
               >
-                {["CUSTOMER", "AGENT", "ADMIN"].map((r) => (
+                {["CUSTOMER", "CUSTOMER_ADMIN", "AGENT", "SUPERVISOR", "ADMIN", "OWNER"].map((r) => (
                   <option key={r} value={r}>
                     {r}
                   </option>
@@ -81,7 +81,7 @@ function UsersPage() {
 
 export default function Page() {
   return (
-    <RequireAuth roles={["ADMIN"]}>
+    <RequireAuth permissions={["user.manage"]}>
       <UsersPage />
     </RequireAuth>
   );

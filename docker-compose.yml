@@ -4,16 +4,24 @@ services:
     image: ticket-be:latest
     container_name: ticket-be
     restart: unless-stopped
-
     env_file:
       - .env
-
     extra_hosts:
       - "host.docker.internal:host-gateway"
-
     expose:
       - "8000"
+    networks:
+      - naman-private-network
 
+  ticket-worker:
+    image: ticket-be:latest
+    container_name: ticket-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["python", "-m", "app.jobs.worker"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - naman-private-network
 

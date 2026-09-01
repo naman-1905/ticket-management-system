@@ -23,6 +23,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [tenantName, setTenantName] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -32,8 +33,8 @@ export default function RegisterPage() {
     setError("");
     setSubmitting(true);
     try {
-      await register(fullName, email, password);
-      router.push("/tickets");
+      await register(fullName, email, password, tenantName);
+      router.push("/dashboard");
     } catch (err) {
       setError(err.message || "Registration failed");
     } finally {
@@ -69,6 +70,15 @@ export default function RegisterPage() {
         </motion.div>
         <motion.div custom={2} initial="hidden" animate="visible" variants={fieldVariants}>
           <Input
+            label="Organization name"
+            required
+            value={tenantName}
+            onChange={(e) => setTenantName(e.target.value)}
+            hint="Your company or team name."
+          />
+        </motion.div>
+        <motion.div custom={3} initial="hidden" animate="visible" variants={fieldVariants}>
+          <Input
             label="Password"
             type="password"
             required
@@ -85,7 +95,7 @@ export default function RegisterPage() {
           </motion.p>
         )}
 
-        <motion.div custom={3} initial="hidden" animate="visible" variants={fieldVariants}>
+        <motion.div custom={4} initial="hidden" animate="visible" variants={fieldVariants}>
           <Button type="submit" disabled={submitting} className="w-full">
             {submitting ? "Creating account…" : "Create account"}
           </Button>
