@@ -4,6 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import RequireAuth from "../components/RequireAuth";
 import { useAuth } from "../../lib/auth-context";
 import { api } from "../../lib/api";
+import Button from "../components/ui/Button";
+import EmptyState from "../components/ui/EmptyState";
+import Input from "../components/ui/Input";
+import PageHeader from "../components/ui/PageHeader";
+import PageTransition from "../components/ui/PageTransition";
+import Select from "../components/ui/Select";
+import Spinner from "../components/ui/Spinner";
+import { Card, ListPanel } from "../components/ui/Card";
 
 function SlaPage() {
   const { user } = useAuth();
@@ -54,85 +62,75 @@ function SlaPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">SLA Policies</h1>
+    <PageTransition className="mx-auto max-w-3xl px-4 py-8">
+      <PageHeader title="SLA Policies" description="Define response and resolution targets by priority." />
 
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      {error && <p className="mb-4 text-sm text-danger">{error}</p>}
 
       {loading ? (
-        <p className="text-slate-500 text-sm">Loading…</p>
+        <Spinner label="Loading policies…" />
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100 mb-8">
+        <ListPanel className="mb-8">
           {policies.map((p) => (
-            <div key={p.id} className="px-4 py-3 flex items-center justify-between text-sm">
+            <div key={p.id} className="flex items-center justify-between px-4 py-3 text-sm">
               <div>
-                <p className="font-medium">{p.name}</p>
-                <p className="text-slate-500 text-xs">
+                <p className="font-medium text-foreground">{p.name}</p>
+                <p className="text-xs text-muted-foreground">
                   {p.priority} · first response {p.first_response_minutes}m · resolve in {p.resolution_hours}h
                 </p>
               </div>
               <span
-                className={`text-xs px-2 py-1 rounded-full ${
-                  p.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                  p.is_active
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
                 {p.is_active ? "Active" : "Inactive"}
               </span>
             </div>
           ))}
-          {policies.length === 0 && <p className="px-4 py-3 text-sm text-slate-500">No policies yet.</p>}
-        </div>
+          {policies.length === 0 && <EmptyState>No policies yet.</EmptyState>}
+        </ListPanel>
       )}
 
       {user.role === "ADMIN" && (
-        <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-lg p-4 space-y-3">
-          <h2 className="font-medium text-sm">Create policy</h2>
-          <input
-            required
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm"
-          />
-          <div className="flex gap-3">
-            <select
-              value={priority}
-              onChange={(e) => setPriority(e.target.value)}
-              className="border border-slate-300 rounded-md px-3 py-2 text-sm bg-white"
-            >
-              {["P1", "P2", "P3", "P4"].map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              min={1}
-              value={firstResponse}
-              onChange={(e) => setFirstResponse(e.target.value)}
-              placeholder="First response (min)"
-              className="border border-slate-300 rounded-md px-3 py-2 text-sm w-40"
-            />
-            <input
-              type="number"
-              min={1}
-              value={resolutionHours}
-              onChange={(e) => setResolutionHours(e.target.value)}
-              placeholder="Resolution (hrs)"
-              className="border border-slate-300 rounded-md px-3 py-2 text-sm w-40"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="bg-slate-900 text-white rounded-md px-4 py-2 text-sm font-medium hover:bg-slate-800 disabled:opacity-50"
-          >
-            {submitting ? "Creating…" : "Create policy"}
-          </button>
-        </form>
+        <Card>
+          <form onSubmit={handleCreate} className="space-y-3">
+            <h2 className="text-sm font-medium text-foreground">Create policy</h2>
+            <Input required placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+            <div className="flex flex-wrap gap-3">
+              <Select value={priority} onChange={(e) => setPriority(e.target.value)} className="rounded-full">
+                {["P1", "P2", "P3", "P4"].map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </Select>
+              <Input
+                type="number"
+                min={1}
+                value={firstResponse}
+                onChange={(e) => setFirstResponse(e.target.value)}
+                placeholder="First response (min)"
+                className="w-40"
+              />
+              <Input
+                type="number"
+                min={1}
+                value={resolutionHours}
+                onChange={(e) => setResolutionHours(e.target.value)}
+                placeholder="Resolution (hrs)"
+                className="w-40"
+              />
+            </div>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Creating…" : "Create policy"}
+            </Button>
+          </form>
+        </Card>
       )}
-    </div>
+    </PageTransition>
   );
 }
 
