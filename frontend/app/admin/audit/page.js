@@ -53,7 +53,10 @@ function AuditPage() {
                 <span className="text-xs text-muted-foreground">{new Date(log.created_at).toLocaleString()}</span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {formatEntityType(log.entity_type)} {log.entity_id ? `· ${log.entity_id}` : ""}
+                {log.actor_name ? `By ${log.actor_name}` : ""}
+                {log.actor_name && (log.entity_name || log.entity_type) ? " · " : ""}
+                {formatEntityType(log.entity_type)}
+                {log.entity_name ? ` · ${log.entity_name}` : ""}
               </p>
             </div>
           ))}
