@@ -3,6 +3,12 @@
 import { useEffect, useState, useCallback } from "react";
 import RequireAuth from "../../components/RequireAuth";
 import { api } from "../../../lib/api";
+import EmptyState from "../../components/ui/EmptyState";
+import PageHeader from "../../components/ui/PageHeader";
+import PageTransition from "../../components/ui/PageTransition";
+import Pagination from "../../components/ui/Pagination";
+import Spinner from "../../components/ui/Spinner";
+import { ListPanel } from "../../components/ui/Card";
 
 function AuditPage() {
   const [items, setItems] = useState([]);
@@ -32,50 +38,30 @@ function AuditPage() {
   const totalPages = Math.max(1, Math.ceil(total / size));
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">Audit Log</h1>
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+    <PageTransition className="mx-auto max-w-4xl px-4 py-8">
+      <PageHeader title="Audit Log" description="Review system activity and changes." />
+      {error && <p className="mb-4 text-sm text-danger">{error}</p>}
       {loading ? (
-        <p className="text-slate-500 text-sm">Loading…</p>
+        <Spinner label="Loading audit log…" />
       ) : (
-        <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100">
+        <ListPanel>
           {items.map((log) => (
             <div key={log.id} className="px-4 py-3 text-sm">
               <div className="flex items-center justify-between">
-                <span className="font-medium">{log.action}</span>
-                <span className="text-xs text-slate-400">{new Date(log.created_at).toLocaleString()}</span>
+                <span className="font-medium text-foreground">{log.action}</span>
+                <span className="text-xs text-muted-foreground">{new Date(log.created_at).toLocaleString()}</span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {log.entity_type} {log.entity_id ? `· ${log.entity_id}` : ""}
               </p>
             </div>
           ))}
-          {items.length === 0 && <p className="px-4 py-3 text-sm text-slate-500">No entries.</p>}
-        </div>
+          {items.length === 0 && <EmptyState>No entries.</EmptyState>}
+        </ListPanel>
       )}
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-3 mt-6 text-sm">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
-            className="px-3 py-1 rounded-md border border-slate-300 disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <span className="text-slate-500">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-            className="px-3 py-1 rounded-md border border-slate-300 disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
-      )}
-    </div>
+      <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+    </PageTransition>
   );
 }
 
