@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import RequireAuth from "../../components/RequireAuth";
 import { api } from "../../../lib/api";
+import { formatAuditAction, formatEntityType } from "../../../lib/format";
 import EmptyState from "../../components/ui/EmptyState";
 import PageHeader from "../../components/ui/PageHeader";
 import PageTransition from "../../components/ui/PageTransition";
@@ -48,11 +49,11 @@ function AuditPage() {
           {items.map((log) => (
             <div key={log.id} className="px-4 py-3 text-sm">
               <div className="flex items-center justify-between">
-                <span className="font-medium text-foreground">{log.action}</span>
+                <span className="font-medium text-foreground">{formatAuditAction(log.action)}</span>
                 <span className="text-xs text-muted-foreground">{new Date(log.created_at).toLocaleString()}</span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {log.entity_type} {log.entity_id ? `· ${log.entity_id}` : ""}
+                {formatEntityType(log.entity_type)} {log.entity_id ? `· ${log.entity_id}` : ""}
               </p>
             </div>
           ))}
