@@ -8,6 +8,7 @@ from ..db import get_db
 from ..models import AuditLog
 from ..schemas import AuditLogOut, Page
 from ..deps import require_permissions
+from ..services.audit import serialize_audit_logs
 
 router = APIRouter()
 
@@ -35,4 +36,4 @@ async def logs(
     rows = (
         await db.execute(q.order_by(AuditLog.created_at.desc()).offset((page - 1) * size).limit(size))
     ).scalars().all()
-    return Page(items=rows, total=total or 0, page=page, size=size)
+    return Page(items=await serialize_audit_logs(db, rows), total=total or 0, page=page, size=size)
