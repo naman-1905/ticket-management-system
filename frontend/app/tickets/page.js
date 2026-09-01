@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { motion } from "framer-motion";
 import RequireAuth from "../components/RequireAuth";
 import StatusBadge from "../components/StatusBadge";
@@ -56,7 +57,10 @@ function TicketsPage() {
         description="Track and manage support requests."
         action={
           <Link href="/tickets/new">
-            <Button>+ New ticket</Button>
+            <Button className="gap-1.5">
+              <Plus className="h-4 w-4" strokeWidth={2} />
+              New ticket
+            </Button>
           </Link>
         }
       />
