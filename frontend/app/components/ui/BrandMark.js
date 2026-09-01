@@ -6,7 +6,7 @@ export default function BrandMark({ size = "md" }) {
   };
 
   return (
-    <span className={`font-semibold tracking-tight text-foreground ${sizes[size]}`}>
+    <span className={`font-semibold tracking-tight text-inherit ${sizes[size]}`}>
       <span className="text-accent">T</span>ickets
     </span>
   );
