@@ -1,6 +1,15 @@
 # Ticket Management System
 
-A full-stack ticket management system built with **Next.js** and **FastAPI**, using **PostgreSQL** as the only backend infrastructure dependency.
+A full-stack service desk platform built with **Next.js** and **FastAPI**, backed by **PostgreSQL**.
+
+## Features
+
+- Multi-tenant organizations with role-based access control
+- Ticket lifecycle management with comments, assignments, and attachments
+- SLA policies and tracking
+- Knowledge base and customer portal
+- Audit logging, notifications, search, and reporting
+- Background worker for async jobs
 
 ## Architecture
 
@@ -8,21 +17,20 @@ A full-stack ticket management system built with **Next.js** and **FastAPI**, us
 ┌──────────────────────────────┐
 │          Frontend            │
 │          Next.js             │
-│        localhost:3000        │
+│          :3000               │
 └──────────────┬───────────────┘
                │ HTTP/REST
                ▼
 ┌──────────────────────────────┐
 │           Backend            │
 │           FastAPI            │
-│        localhost:8000        │
+│          :8000               │
 └──────────────┬───────────────┘
                │ PostgreSQL
                ▼
 ┌──────────────────────────────┐
 │         PostgreSQL           │
-│        192.168.1.38:5432     │
-│        Database: ticketing_db│
+│          :5432               │
 └──────────────────────────────┘
 ```
 
@@ -30,41 +38,18 @@ A full-stack ticket management system built with **Next.js** and **FastAPI**, us
 
 ```text
 ticket-management-system/
-│
 ├── backend/
-│   ├── .venv/
-│   ├── .env
+│   ├── app/              # FastAPI application
+│   ├── alembic/          # Database migrations
+│   ├── scripts/          # Bootstrap and maintenance scripts
+│   ├── tests/
 │   ├── requirements.txt
-│   ├── README.md
-│   │
-│   └── app/
-│       ├── __init__.py
-│       ├── config.py
-│       ├── db.py
-│       ├── deps.py
-│       ├── main.py
-│       ├── models.py
-│       ├── schemas.py
-│       ├── security.py
-│       ├── utils.py
-│       │
-│       └── routers/
-│           ├── __init__.py
-│           ├── auth.py
-│           ├── users.py
-│           ├── tickets.py
-│           ├── sla.py
-│           └── audit.py
-│
+│   └── .env.example
 ├── frontend/
-│   ├── app/
-│   ├── lib/
-│   ├── public/
-│   ├── package.json
-│   └── ...
-│
-├── compose.yaml
-├── Jenkinsfile
+│   ├── app/              # Next.js App Router pages
+│   ├── lib/              # API client, auth, permissions
+│   └── .env.example
+├── docker-compose.yml
 ├── start.bat
 ├── start.sh
 └── README.md
@@ -72,718 +57,227 @@ ticket-management-system/
 
 ## Technology Stack
 
-### Frontend
+| Layer    | Technologies |
+| -------- | ------------ |
+| Frontend | Next.js, React, Tailwind CSS |
+| Backend  | FastAPI, SQLAlchemy 2, asyncpg, Pydantic, Alembic |
+| Auth     | JWT access tokens, opaque refresh tokens, Argon2 password hashing |
+| Database | PostgreSQL |
 
-* Next.js
-* React
-* JavaScript
-* Next.js App Router
+## Prerequisites
 
-### Backend
+- Python 3.12+
+- Node.js 18+
+- PostgreSQL 14+
 
-* FastAPI
-* Python
-* SQLAlchemy 2
-* asyncpg
-* Pydantic
-* JWT authentication
-* Argon2 password hashing
+## Quick Start
 
-### Database
+### 1. Database
 
-* PostgreSQL 18
-* Database: `ticketing_db`
-* Host: `192.168.1.38`
-* Port: `5432`
-* User: `naman`
+Create a PostgreSQL database:
 
-### Infrastructure
-
-The backend intentionally uses PostgreSQL as its only external infrastructure dependency.
-
-Not used:
-
-* Redis
-* RabbitMQ
-* Celery
-* Kafka
-* Prometheus
-* Alembic
-
-Database tables are created automatically by SQLAlchemy when the backend starts.
-
----
-
-# Backend
-
-## Requirements
-
-* Python 3.12+
-* PostgreSQL
-* PostgreSQL must be reachable from the development machine on port `5432`
-
-## Backend Setup
-
-From the project root:
-
-```cmd
-cd backend
+```sql
+CREATE DATABASE ticketing_db;
 ```
 
-Create the virtual environment:
+### 2. Backend
 
-```cmd
+```bash
+cd backend
 python -m venv .venv
 ```
 
-Activate it in Windows CMD:
+**Windows**
 
 ```cmd
 .venv\Scripts\activate.bat
 ```
 
-Verify Python:
+**Linux / macOS**
 
-```cmd
-where python
+```bash
+source .venv/bin/activate
 ```
 
-The first result should be:
+Install dependencies and configure the environment:
 
-```text
-D:\Projects\ticket-management-system\backend\.venv\Scripts\python.exe
-```
-
-Install dependencies:
-
-```cmd
+```bash
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
+cp .env.example .env
 ```
 
-## Backend Environment
-
-Create:
-
-```text
-backend/.env
-```
-
-Example:
+Edit `backend/.env` with your database credentials and a strong JWT secret:
 
 ```env
-DATABASE_URL=postgresql+asyncpg://naman:YOUR_PASSWORD@192.168.1.38:5432/ticketing_db
-
-JWT_SECRET_KEY=YOUR_GENERATED_SECRET
-
-ACCESS_TOKEN_EXPIRE_MINUTES=30
-REFRESH_TOKEN_EXPIRE_DAYS=30
-
-APP_VERSION=1.0.0
+DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/ticketing_db
+JWT_SECRET_KEY=your-generated-secret
 ```
 
-Do not commit `.env`.
+Generate a JWT secret:
 
-The PostgreSQL password and JWT secret must never be committed to source control.
-
-## Generate JWT Secret
-
-Generate a strong secret with:
-
-```cmd
+```bash
 python -c "import secrets; print(secrets.token_urlsafe(64))"
 ```
 
-Copy the generated value into:
+Bootstrap the schema:
 
-```env
-JWT_SECRET_KEY=...
+```bash
+python -m scripts.bootstrap_db
 ```
 
-## Verify Database Configuration
+Start the API:
 
-Run:
-
-```cmd
-python -c "from app.config import settings; from sqlalchemy.engine import make_url; u=make_url(settings.database_url); print('driver:',u.drivername); print('host:',u.host); print('port:',u.port); print('database:',u.database); print('username:',u.username)"
-```
-
-Expected:
-
-```text
-driver: postgresql+asyncpg
-host: 192.168.1.38
-port: 5432
-database: ticketing_db
-username: naman
-```
-
-## Test PostgreSQL Connectivity
-
-From Windows:
-
-```cmd
-powershell -Command "Test-NetConnection 192.168.1.38 -Port 5432"
-```
-
-Expected:
-
-```text
-TcpTestSucceeded : True
-```
-
-## Start Backend
-
-```cmd
-cd backend
-.venv\Scripts\activate.bat
+```bash
 python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Backend:
+- API: `http://localhost:8000`
+- Swagger UI: `http://localhost:8000/docs`
+- OpenAPI: `http://localhost:8000/openapi.json`
 
-```text
-http://localhost:8000
-```
+### 3. Frontend
 
-Swagger UI:
-
-```text
-http://localhost:8000/docs
-```
-
-OpenAPI:
-
-```text
-http://localhost:8000/openapi.json
-```
-
----
-
-# Frontend
-
-## Requirements
-
-* Node.js
-* npm
-
-## Install Dependencies
-
-```cmd
+```bash
 cd frontend
 npm install
+cp .env.example .env.local
 ```
 
-## Start Development Server
-
-```cmd
-npm run dev
-```
-
-Frontend:
-
-```text
-http://localhost:3000
-```
-
-The frontend API URL should point to the FastAPI backend.
-
-Example:
+Set the API URL in `frontend/.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 ```
 
----
-
-# Start Everything
-
-## Windows
-
-The project contains:
-
-```text
-start.bat
-```
-
-Run from the project root:
-
-```cmd
-start.bat
-```
-
-This starts:
-
-```text
-Frontend → http://localhost:3000
-Backend  → http://localhost:8000
-```
-
-The backend and frontend run in separate terminal windows so their logs remain independent.
-
-## WSL / Linux
-
-The project also contains:
-
-```text
-start.sh
-```
-
-Make it executable:
+Start the dev server:
 
 ```bash
-chmod +x start.sh
-```
-
-Run:
-
-```bash
-./start.sh
-```
-
----
-
-# API
-
-All versioned API routes use:
-
-```text
-/api/v1
-```
-
-## Root & Health
-
-| Method | Endpoint               | Auth | Purpose                   |
-| ------ | ---------------------- | ---- | ------------------------- |
-| GET    | `/`                    | —    | Service banner            |
-| GET    | `/healthz`             | —    | Liveness + database state |
-| GET    | `/health`              | —    | Liveness + database state |
-| GET    | `/health/db`           | —    | Database health           |
-| GET    | `/api/v1/meta/version` | —    | Application version       |
-
-## Authentication
-
-| Method | Endpoint                | Auth   |
-| ------ | ----------------------- | ------ |
-| POST   | `/api/v1/auth/register` | Public |
-| POST   | `/api/v1/auth/login`    | Public |
-| POST   | `/api/v1/auth/refresh`  | Public |
-| POST   | `/api/v1/auth/logout`   | Bearer |
-| GET    | `/api/v1/auth/me`       | Bearer |
-
-Authentication uses:
-
-```text
-Authorization: Bearer <access_token>
-```
-
-Roles:
-
-```text
-CUSTOMER
-AGENT
-ADMIN
-```
-
-## Users
-
-| Method | Endpoint                       | Roles        |
-| ------ | ------------------------------ | ------------ |
-| GET    | `/api/v1/users`                | AGENT, ADMIN |
-| PATCH  | `/api/v1/users/{user_id}/role` | ADMIN        |
-
-## Tickets
-
-| Method | Endpoint                               | Roles                  |
-| ------ | -------------------------------------- | ---------------------- |
-| POST   | `/api/v1/tickets`                      | Any authenticated user |
-| GET    | `/api/v1/tickets`                      | Any authenticated user |
-| GET    | `/api/v1/tickets/{ticket_id}`          | Any authenticated user |
-| PATCH  | `/api/v1/tickets/{ticket_id}/status`   | Authenticated          |
-| POST   | `/api/v1/tickets/{ticket_id}/assign`   | AGENT, ADMIN           |
-| GET    | `/api/v1/tickets/{ticket_id}/comments` | Authenticated          |
-| POST   | `/api/v1/tickets/{ticket_id}/comments` | Authenticated          |
-| GET    | `/api/v1/tickets/{ticket_id}/sla`      | Authenticated          |
-
-Customers are restricted to their own tickets.
-
-Agents and administrators can work with tickets across customers.
-
-## SLA
-
-| Method | Endpoint                           | Roles        |
-| ------ | ---------------------------------- | ------------ |
-| GET    | `/api/v1/sla/policies`             | AGENT, ADMIN |
-| POST   | `/api/v1/sla/policies`             | ADMIN        |
-| PATCH  | `/api/v1/sla/policies/{policy_id}` | ADMIN        |
-
-## Audit
-
-| Method | Endpoint             | Roles |
-| ------ | -------------------- | ----- |
-| GET    | `/api/v1/audit/logs` | ADMIN |
-
----
-
-# Authentication Flow
-
-## Register
-
-```http
-POST /api/v1/auth/register
-```
-
-```json
-{
-  "email": "user@example.com",
-  "full_name": "Jane Doe",
-  "password": "min-8-chars"
-}
-```
-
-Returns:
-
-```json
-{
-  "access_token": "<jwt>",
-  "refresh_token": "<opaque>",
-  "token_type": "bearer"
-}
-```
-
-The first registered account becomes `ADMIN`.
-
-Subsequent accounts default to `CUSTOMER`.
-
-## Login
-
-```http
-POST /api/v1/auth/login
-```
-
-```json
-{
-  "email": "user@example.com",
-  "password": "password"
-}
-```
-
-## Refresh
-
-```http
-POST /api/v1/auth/refresh
-```
-
-```json
-{
-  "refresh_token": "<opaque>"
-}
-```
-
-Refresh tokens are rotated.
-
-Reusing an already-revoked refresh token revokes the entire token family.
-
-## Current User
-
-```http
-GET /api/v1/auth/me
-Authorization: Bearer <access_token>
-```
-
----
-
-# Ticket Lifecycle
-
-Ticket statuses:
-
-```text
-OPEN
-IN_PROGRESS
-ON_HOLD
-RESOLVED
-CLOSED
-```
-
-Transitions are controlled by the caller's role.
-
-The backend validates status changes before updating the ticket.
-
-Status changes are audited.
-
----
-
-# SLA
-
-When a ticket is created, the backend searches for an active SLA policy matching the ticket priority.
-
-Priorities:
-
-```text
-P1
-P2
-P3
-P4
-```
-
-The matching policy is attached to the ticket.
-
-SLA tracking includes:
-
-```text
-first_response_due_at
-resolution_due_at
-first_responded_at
-resolved_at
-breached_at
-status
-```
-
----
-
-# Idempotency
-
-The following endpoints support an optional:
-
-```http
-Idempotency-Key: <unique-key>
-```
-
-Supported endpoints:
-
-```text
-POST /api/v1/tickets
-POST /api/v1/tickets/{ticket_id}/comments
-```
-
-Idempotency records are stored in PostgreSQL.
-
-Repeated requests using the same key for the same user and endpoint return the previously stored response.
-
----
-
-# Pagination
-
-List endpoints use:
-
-```text
-page
-size
-```
-
-Defaults:
-
-```text
-page = 1
-size = 20
-```
-
-Maximum:
-
-```text
-size = 100
-```
-
-Example:
-
-```text
-GET /api/v1/tickets?page=1&size=20
-```
-
-Response:
-
-```json
-{
-  "items": [],
-  "total": 0,
-  "page": 1,
-  "size": 20
-}
-```
-
----
-
-# Error Format
-
-API errors use:
-
-```json
-{
-  "error": {
-    "code": "NOT_FOUND",
-    "message": "Resource not found",
-    "details": {}
-  },
-  "request_id": "<uuid>"
-}
-```
-
-Common error codes:
-
-| Code                  | HTTP | Meaning                        |
-| --------------------- | ---: | ------------------------------ |
-| `VALIDATION_ERROR`    |  422 | Request validation failed      |
-| `AUTH_REQUIRED`       |  401 | Authentication required        |
-| `AUTH_INVALID`        |  401 | Invalid or expired credentials |
-| `REFRESH_TOKEN_REUSE` |  401 | Refresh token reuse detected   |
-| `FORBIDDEN`           |  403 | Insufficient permissions       |
-| `NOT_FOUND`           |  404 | Resource does not exist        |
-| `CONFLICT`            |  409 | Resource/state conflict        |
-| `RATE_LIMITED`        |  429 | Rate limit exceeded            |
-| `INTERNAL_ERROR`      |  500 | Unhandled server error         |
-
----
-
-# Database
-
-PostgreSQL is the sole persistence and infrastructure dependency.
-
-The backend uses:
-
-```text
-SQLAlchemy 2
-asyncpg
-```
-
-Connection format:
-
-```text
-postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DATABASE
-```
-
-Current development database:
-
-```text
-Host:     192.168.1.38
-Port:     5432
-Database: ticketing_db
-User:     naman
-```
-
-Tables are created automatically at application startup.
-
-There is intentionally no Alembic migration layer.
-
----
-
-# Security
-
-## Passwords
-
-Passwords are never stored in plaintext.
-
-They are hashed using Argon2 through `pwdlib`.
-
-## Access Tokens
-
-Access tokens are JWTs.
-
-They contain:
-
-```text
-sub
-role
-type
-exp
-```
-
-## Refresh Tokens
-
-Refresh tokens are opaque random values.
-
-Only their hashes are persisted in PostgreSQL.
-
-Refresh-token rotation is enforced.
-
-Refresh-token reuse revokes the complete token family.
-
-## Secrets
-
-Never commit:
-
-```text
-.env
-```
-
-to Git.
-
-Use:
-
-```text
-.env.example
-```
-
-for configuration documentation and placeholders.
-
----
-
-# Development Commands
-
-## Backend
-
-Activate environment:
-
-```cmd
-cd backend
-.venv\Scripts\activate.bat
-```
-
-Run:
-
-```cmd
-python -m uvicorn app.main:app --reload --port 8000
-```
-
-Install dependencies:
-
-```cmd
-python -m pip install -r requirements.txt
-```
-
-## Frontend
-
-```cmd
-cd frontend
-npm install
 npm run dev
 ```
 
----
+Frontend: `http://localhost:3000`
 
-# Production Considerations
+### 4. Start Both (optional)
 
-Before production deployment:
+From the project root:
 
-* Use a production-grade PostgreSQL instance.
-* Use a strong randomly generated `JWT_SECRET_KEY`.
-* Store secrets in environment variables or a secrets manager.
-* Do not expose PostgreSQL directly to the public internet.
-* Restrict PostgreSQL access to trusted application hosts.
-* Use HTTPS.
-* Configure CORS explicitly for production frontend origins.
-* Run FastAPI behind a production reverse proxy.
-* Use a process manager/container orchestration strategy appropriate for deployment.
-* Establish a real database migration strategy before making schema changes in production.
+```cmd
+start.bat
+```
 
-The current automatic `create_all()` approach is intended for the current development architecture and deliberately replaces Alembic because this project currently requires PostgreSQL-only infrastructure with no migration service.
+```bash
+chmod +x start.sh && ./start.sh
+```
 
----
+## Frontend Pages
 
-# Current Development URLs
+| Route | Description |
+| ----- | ----------- |
+| `/login`, `/register` | Authentication |
+| `/dashboard` | Staff overview |
+| `/tickets`, `/tickets/new`, `/tickets/[id]` | Ticket management |
+| `/sla` | SLA policy management |
+| `/customers` | Organization management |
+| `/admin/users` | User and role management |
+| `/admin/audit` | Audit log viewer |
+| `/portal/tickets` | Customer ticket portal |
+| `/portal/kb` | Customer knowledge base |
+
+## API Overview
+
+All versioned routes are under `/api/v1`.
+
+| Area | Prefix |
+| ---- | ------ |
+| Auth | `/api/v1/auth` |
+| Users | `/api/v1/users` |
+| Tickets | `/api/v1/tickets` |
+| SLA | `/api/v1/sla` |
+| Audit | `/api/v1/audit` |
+| Organizations | `/api/v1/organizations` |
+| Contacts | `/api/v1/contacts` |
+| Teams | `/api/v1/teams` |
+| Notifications | `/api/v1/notifications` |
+| Search | `/api/v1/search` |
+| Reports | `/api/v1/reports` |
+| Knowledge base | `/api/v1/kb` |
+| CSAT | `/api/v1/csat` |
+| Attachments | `/api/v1/attachments` |
+| Automations | `/api/v1/automations` |
+
+See [backend/README.md](backend/README.md) for detailed endpoint documentation.
+
+### Authentication
+
+Requests use a Bearer token:
 
 ```text
-Frontend
-http://localhost:3000
-
-Backend
-http://localhost:8000
-
-Swagger
-http://localhost:8000/docs
-
-OpenAPI
-http://localhost:8000/openapi.json
-
-PostgreSQL
-192.168.1.38:5432
+Authorization: Bearer <access_token>
 ```
+
+Register or log in to receive an access/refresh token pair. The first registered account in a tenant becomes an administrator.
+
+### Pagination
+
+List endpoints accept `page` (default `1`) and `size` (default `20`, max `100`).
+
+### Idempotency
+
+`POST /api/v1/tickets` and `POST /api/v1/tickets/{id}/comments` accept an optional `Idempotency-Key` header.
+
+## Environment Variables
+
+### Backend (`backend/.env`)
+
+| Variable | Description |
+| -------- | ----------- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET_KEY` | Secret for signing access tokens |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token lifetime (default `30`) |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token lifetime (default `30`) |
+| `CORS_ORIGINS` | Comma-separated allowed origins |
+| `DOCS_ENABLED` | Enable Swagger UI (`true`/`false`) |
+| `STORAGE_DIR` | Local file storage path |
+| `WORKER_POLL_SECONDS` | Background worker poll interval |
+
+### Frontend (`frontend/.env.local`)
+
+| Variable | Description |
+| -------- | ----------- |
+| `NEXT_PUBLIC_API_URL` | Backend API base URL |
+
+## Development
+
+### Run backend tests
+
+```bash
+cd backend
+pytest
+```
+
+### Database migrations
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+## Docker
+
+The project includes a `docker-compose.yml` for containerized deployment. Configure a `.env` file at the project root before running:
+
+```bash
+docker compose up -d
+```
+
+## Security Notes
+
+- Never commit `.env` files or secrets to source control.
+- Use a strong, randomly generated `JWT_SECRET_KEY` in production.
+- Restrict PostgreSQL access to trusted application hosts.
+- Use HTTPS and configure CORS for production frontend origins.
+
+## License
+
+Private project — all rights reserved.
