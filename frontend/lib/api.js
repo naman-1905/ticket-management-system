@@ -165,6 +165,7 @@ export const api = {
   createKBArticle: (payload) => request("/kb/articles", { method: "POST", body: payload }),
 
   submitCSAT: (ticketId, payload) => request(`/csat/tickets/${ticketId}`, { method: "POST", body: payload }),
+  getCSAT: (ticketId) => request(`/csat/tickets/${ticketId}`),
 
   listAttachments: (ticketId) => request(`/attachments/tickets/${ticketId}`),
   uploadAttachment: (ticketId, file) => {

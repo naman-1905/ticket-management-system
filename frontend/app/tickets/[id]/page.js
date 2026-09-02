@@ -12,6 +12,7 @@ import Select from "../../components/ui/Select";
 import Spinner from "../../components/ui/Spinner";
 import Textarea from "../../components/ui/Textarea";
 import { Card } from "../../components/ui/Card";
+import CSATWidget from "../../components/CSATWidget";
 import { useAuth } from "../../../lib/auth-context";
 import { api } from "../../../lib/api";
 
@@ -182,6 +183,10 @@ function TicketDetail() {
           )}
         </div>
       </Card>
+
+      {(ticket.status === "RESOLVED" || ticket.status === "CLOSED") && (
+        <CSATWidget ticketId={id} />
+      )}
 
       <h2 className="mb-3 text-lg font-semibold tracking-tight text-foreground">Comments</h2>
       <div className="mb-6 space-y-3">

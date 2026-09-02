@@ -40,3 +40,16 @@ async def submit_csat(
     await db.commit()
     await db.refresh(rating)
     return rating
+
+
+@router.get("/tickets/{ticket_id}", response_model=CSATOut | None)
+async def get_csat(
+    ticket_id: uuid.UUID,
+    user=Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await get_ticket_for_user(db, ticket_id, user)
+    rating = (
+        await db.execute(select(CSATRating).where(CSATRating.ticket_id == ticket.id))
+    ).scalar_one_or_none()
+    return rating
