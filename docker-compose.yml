@@ -11,7 +11,7 @@ services:
     expose:
       - "8000"
     networks:
-      - ticket-private-network
+      - naman-private-network
 
   ticket-worker:
     image: ticket-be:latest
@@ -23,7 +23,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
-      - ticket-private-network
+      - naman-private-network
 
   ticket-fe:
     image: ticket-fe:latest
@@ -37,8 +37,8 @@ services:
       - ticket-be
 
     networks:
-      - ticket-private-network
+      - naman-private-network
 
 networks:
-  ticket-private-network:
+  naman-private-network:
     external: true
