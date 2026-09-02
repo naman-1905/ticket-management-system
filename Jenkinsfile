@@ -2,6 +2,14 @@ pipeline {
 
     agent any
 
+    parameters {
+        choice(
+            name: 'BUILD_TARGET',
+            choices: ['BOTH', 'BACKEND', 'FRONTEND'],
+            description: 'Which components to build and deploy'
+        )
+    }
+
     environment {
         FRONTEND_IMAGE      = "ticket-fe:latest"
         BACKEND_IMAGE       = "ticket-be:latest"
@@ -11,6 +19,7 @@ pipeline {
         FRONTEND_URL        = "https://ticket.namanchaturvedi.com"
         BACKEND_URL         = "https://ticket-be.namanchaturvedi.com"
         DEPLOY_HOST         = "192.168.1.38"
+        BUILD_TARGET        = "${params.BUILD_TARGET}"
     }
 
     stages {
@@ -22,6 +31,9 @@ pipeline {
         }
 
         stage('Build Backend') {
+            when {
+                expression { params.BUILD_TARGET in ['BOTH', 'BACKEND'] }
+            }
             steps {
                 sh '''
                     docker build \
@@ -32,6 +44,9 @@ pipeline {
         }
 
         stage('Build Frontend') {
+            when {
+                expression { params.BUILD_TARGET in ['BOTH', 'FRONTEND'] }
+            }
             steps {
                 sh '''
                     docker build \
@@ -55,6 +70,7 @@ pipeline {
 
                         cp "$TICKET_ENV_FILE" .env
 
+                        echo "=== Build target: ${BUILD_TARGET} ==="
                         echo "=== ENV keys ==="
                         sed 's/=.*$/=<REDACTED>/' .env
 
@@ -66,10 +82,28 @@ pipeline {
                         echo "Frontend: ${FRONTEND_URL}"
                         echo "Backend:  ${BACKEND_URL}"
 
-                        docker compose \
-                            -f ${COMPOSE_FILE} \
-                            up -d \
-                            --force-recreate
+                        case "${BUILD_TARGET}" in
+                            BACKEND)
+                                docker compose \
+                                    -f ${COMPOSE_FILE} \
+                                    up -d \
+                                    --force-recreate \
+                                    ticket-be ticket-worker
+                                ;;
+                            FRONTEND)
+                                docker compose \
+                                    -f ${COMPOSE_FILE} \
+                                    up -d \
+                                    --force-recreate \
+                                    ticket-fe
+                                ;;
+                            *)
+                                docker compose \
+                                    -f ${COMPOSE_FILE} \
+                                    up -d \
+                                    --force-recreate
+                                ;;
+                        esac
 
                         rm -f .env
                     '''
@@ -87,30 +121,34 @@ pipeline {
                     echo "=== Containers ==="
                     docker ps
 
-                    echo "=== Backend status ==="
-                    BACKEND_STATUS=$(docker inspect \
-                        --format='{{.State.Status}}' \
-                        ticket-be)
+                    if [ "${BUILD_TARGET}" = "BACKEND" ] || [ "${BUILD_TARGET}" = "BOTH" ]; then
+                        echo "=== Backend status ==="
+                        BACKEND_STATUS=$(docker inspect \
+                            --format='{{.State.Status}}' \
+                            ticket-be)
 
-                    echo "$BACKEND_STATUS"
+                        echo "$BACKEND_STATUS"
 
-                    if [ "$BACKEND_STATUS" != "running" ]; then
-                        echo "Backend is not running."
-                        docker logs --tail 100 ticket-be
-                        exit 1
+                        if [ "$BACKEND_STATUS" != "running" ]; then
+                            echo "Backend is not running."
+                            docker logs --tail 100 ticket-be
+                            exit 1
+                        fi
                     fi
 
-                    echo "=== Frontend status ==="
-                    FRONTEND_STATUS=$(docker inspect \
-                        --format='{{.State.Status}}' \
-                        ticket-fe)
+                    if [ "${BUILD_TARGET}" = "FRONTEND" ] || [ "${BUILD_TARGET}" = "BOTH" ]; then
+                        echo "=== Frontend status ==="
+                        FRONTEND_STATUS=$(docker inspect \
+                            --format='{{.State.Status}}' \
+                            ticket-fe)
 
-                    echo "$FRONTEND_STATUS"
+                        echo "$FRONTEND_STATUS"
 
-                    if [ "$FRONTEND_STATUS" != "running" ]; then
-                        echo "Frontend is not running."
-                        docker logs --tail 100 ticket-fe
-                        exit 1
+                        if [ "$FRONTEND_STATUS" != "running" ]; then
+                            echo "Frontend is not running."
+                            docker logs --tail 100 ticket-fe
+                            exit 1
+                        fi
                     fi
 
                     echo "=== Deployment verification passed ==="
