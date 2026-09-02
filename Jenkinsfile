@@ -6,7 +6,11 @@ pipeline {
         FRONTEND_IMAGE      = "ticket-fe:latest"
         BACKEND_IMAGE       = "ticket-be:latest"
         COMPOSE_FILE        = "docker-compose.yml"
+        DOCKER_NETWORK      = "naman-private-network"
         NEXT_PUBLIC_API_URL = "https://ticket-be.namanchaturvedi.com/api/v1"
+        FRONTEND_URL        = "https://ticket.namanchaturvedi.com"
+        BACKEND_URL         = "https://ticket-be.namanchaturvedi.com"
+        DEPLOY_HOST         = "192.168.1.38"
     }
 
     stages {
@@ -39,32 +43,39 @@ pipeline {
         }
 
         stage('Deploy') {
-    steps {
-        withCredentials([
-            file(
-                credentialsId: 'ticket-env',
-                variable: 'TICKET_ENV_FILE'
-            )
-        ]) {
-            sh '''
-                set -e
+            steps {
+                withCredentials([
+                    file(
+                        credentialsId: 'ticket-env',
+                        variable: 'TICKET_ENV_FILE'
+                    )
+                ]) {
+                    sh '''
+                        set -e
 
-                cp "$TICKET_ENV_FILE" .env
+                        cp "$TICKET_ENV_FILE" .env
 
-                echo "=== ENV keys ==="
-                sed 's/=.*$/=<REDACTED>/' .env
+                        echo "=== ENV keys ==="
+                        sed 's/=.*$/=<REDACTED>/' .env
 
-                echo "=== Deploying ==="
-                docker compose \
-                    -f ${COMPOSE_FILE} \
-                    up -d \
-                    --force-recreate
+                        echo "=== Ensuring Docker network exists ==="
+                        docker network inspect ${DOCKER_NETWORK} >/dev/null 2>&1 \
+                            || docker network create ${DOCKER_NETWORK}
 
-                rm -f .env
-            '''
+                        echo "=== Deploying to ${DEPLOY_HOST} ==="
+                        echo "Frontend: ${FRONTEND_URL}"
+                        echo "Backend:  ${BACKEND_URL}"
+
+                        docker compose \
+                            -f ${COMPOSE_FILE} \
+                            up -d \
+                            --force-recreate
+
+                        rm -f .env
+                    '''
+                }
+            }
         }
-    }
-}
 
         stage('Verify') {
             steps {
