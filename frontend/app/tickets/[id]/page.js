@@ -34,6 +34,7 @@ function TicketDetail() {
   const [posting, setPosting] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [macros, setMacros] = useState([]);
 
   const canManage = hasPermission(user, "ticket.transition") || hasPermission(user, "ticket.assign");
   const canInternal = hasPermission(user, "comment.internal.write");
@@ -57,6 +58,10 @@ function TicketDetail() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    api.listMacros().then(setMacros).catch(() => {});
+  }, []);
 
   async function handleStatusChange(newStatus) {
     setStatusUpdating(true);
@@ -206,6 +211,23 @@ function TicketDetail() {
 
       <Card>
         <form onSubmit={handleAddComment} className="space-y-3">
+          {macros.length > 0 && (
+            <Select
+              label="Insert a macro"
+              value=""
+              onChange={(e) => {
+                const m = macros.find((x) => x.id === e.target.value);
+                if (m) setCommentBody(m.reply_body || "");
+              }}
+            >
+              <option value="">Choose a canned reply…</option>
+              {macros.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </Select>
+          )}
           <Textarea
             rows={3}
             placeholder="Write a comment…"
