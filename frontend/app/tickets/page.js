@@ -15,6 +15,7 @@ import Pagination from "../components/ui/Pagination";
 import Select from "../components/ui/Select";
 import Spinner from "../components/ui/Spinner";
 import { ListPanel } from "../components/ui/Card";
+import Input from "../components/ui/Input";
 import { api } from "../../lib/api";
 
 const STATUSES = ["OPEN", "IN_PROGRESS", "ON_HOLD", "RESOLVED", "CLOSED"];
@@ -27,14 +28,24 @@ function TicketsPage() {
   const [size] = useState(20);
   const [status, setStatus] = useState("");
   const [priority, setPriority] = useState("");
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setQuery(search.trim());
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const data = await api.listTickets({ page, size, status, priority });
+      const data = await api.listTickets({ page, size, status, priority, q: query });
       setItems(data.items);
       setTotal(data.total);
     } catch (err) {
@@ -42,7 +53,7 @@ function TicketsPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, size, status, priority]);
+  }, [page, size, status, priority, query]);
 
   useEffect(() => {
     load();
@@ -65,7 +76,15 @@ function TicketsPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap gap-3">
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <Input
+          label="Search"
+          placeholder="Search by number, title, description…"
+          aria-label="Search tickets"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="min-w-[240px] flex-1"
+        />
         <Select
           value={status}
           onChange={(e) => {
