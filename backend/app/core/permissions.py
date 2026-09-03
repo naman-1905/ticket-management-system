@@ -29,6 +29,8 @@ PERMISSIONS = [
     "kb.manage",
     "kb.view",
     "notification.manage",
+    "event.view",
+    "event.admin",
 ]
 
 DEFAULT_ROLES: dict[str, list[str]] = {

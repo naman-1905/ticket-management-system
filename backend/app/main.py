@@ -31,6 +31,7 @@ from .routers import (
     csat,
     attachments,
     automations,
+    events,
 )
 
 logger = logging.getLogger(__name__)
@@ -147,3 +148,4 @@ app.include_router(kb.router, prefix="/api/v1/kb", tags=["kb"])
 app.include_router(csat.router, prefix="/api/v1/csat", tags=["csat"])
 app.include_router(attachments.router, prefix="/api/v1/attachments", tags=["attachments"])
 app.include_router(automations.router, prefix="/api/v1", tags=["automations"])
+app.include_router(events.router, prefix="/api/v1", tags=["events"])

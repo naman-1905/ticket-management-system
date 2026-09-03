@@ -10,6 +10,8 @@ from ..config import settings
 from ..db import engine
 from ..models import WorkerHeartbeat, Job
 from ..services.sla import process_sla_breaches
+from ..services.events import relay_events
+from ..services.event_consumers import register_builtin_consumers
 
 logger = logging.getLogger(__name__)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
@@ -62,12 +64,14 @@ async def run_once():
         await heartbeat(db)
         await process_sla_breaches(db)
         await process_jobs(db)
+        await relay_events(db)
         await db.commit()
 
 
 async def main():
     logging.basicConfig(level=logging.INFO)
     logger.info("Worker %s started", WORKER_ID)
+    register_builtin_consumers()
     while True:
         try:
             await run_once()

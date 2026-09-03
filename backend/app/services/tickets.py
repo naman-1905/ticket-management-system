@@ -22,6 +22,7 @@ from ..models import (
 )
 from ..services.tenancy import user_has_permission
 from .audit import audit_log
+from .events import emit_event
 from .idempotency import get_idempotent, save_idempotent
 
 
@@ -156,6 +157,19 @@ async def create_ticket(
     await db.flush()
     await attach_sla(db, ticket)
     await audit_log(db, user, "ticket.created", "ticket", ticket.id, new_values={"ticket_number": ticket.ticket_number})
+    await emit_event(
+        db,
+        ticket.tenant_id,
+        "ticket.created",
+        "ticket",
+        ticket.id,
+        {
+            "ticket_id": str(ticket.id),
+            "ticket_number": ticket.ticket_number,
+            "status": ticket.status,
+            "priority": ticket.priority,
+        },
+    )
     await save_idempotent(db, user, endpoint, idempotency_key, 201, ticket_to_dict(ticket))
     return ticket
 
@@ -212,6 +226,19 @@ async def transition_ticket(
         old_values={"status": old_status},
         new_values={"status": to_status},
         correlation_id=request_id,
+    )
+    await emit_event(
+        db,
+        ticket.tenant_id,
+        "ticket.status_changed",
+        "ticket",
+        ticket.id,
+        {
+            "ticket_id": str(ticket.id),
+            "ticket_number": ticket.ticket_number,
+            "from_status": old_status,
+            "to_status": to_status,
+        },
     )
     return ticket
 

@@ -326,6 +326,33 @@ class ReportSummary(BaseModel):
     unassigned: int
 
 
+class EventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    tenant_id: uuid.UUID | None
+    event_type: str
+    entity_type: str
+    entity_id: uuid.UUID | None
+    payload_json: dict
+    schema_version: int
+    created_at: datetime
+    published_at: datetime | None
+
+
+class DeadLetterOut(BaseModel):
+    delivery_id: uuid.UUID
+    consumer_name: str
+    status: str
+    attempts: int
+    last_error: str | None
+    updated_at: datetime
+    event_id: uuid.UUID
+    event_type: str
+    entity_type: str
+    entity_id: uuid.UUID | None
+    created_at: datetime
+
+
 T = TypeVar("T")
 
 

@@ -90,3 +90,45 @@ def test_build_search_vector():
         description = "Some Desc"
 
     assert build_search_vector(T()) == "tck-000001 hello world some desc"
+
+
+def test_event_types_registered():
+    from app.domain.events import EVENT_TYPES, is_known_event_type
+
+    assert "ticket.created" in EVENT_TYPES
+    assert "ticket.status_changed" in EVENT_TYPES
+    assert is_known_event_type("ticket.created")
+    assert is_known_event_type("ticket.status_changed")
+    assert not is_known_event_type("does.not.exist")
+
+
+def test_missing_payload_keys():
+    from app.domain.events import missing_payload_keys
+
+    # ticket.created requires ticket_id + ticket_number.
+    assert missing_payload_keys("ticket.created", {"ticket_number": "TCK-1"}) == ["ticket_id"]
+    assert missing_payload_keys("ticket.created", {"ticket_id": "x", "ticket_number": "y"}) == []
+
+    # ticket.status_changed requires from_status + to_status (and ticket_id).
+    missing = missing_payload_keys("ticket.status_changed", {"ticket_id": "x"})
+    assert "from_status" in missing and "to_status" in missing
+    assert missing_payload_keys(
+        "ticket.status_changed",
+        {"ticket_id": "x", "from_status": "NEW", "to_status": "OPEN"},
+    ) == []
+
+    # Unknown event type -> no keys enforced.
+    assert missing_payload_keys("unknown.type", {}) == []
+
+
+def test_register_builtin_consumers_is_idempotent():
+    from app.services import events as ev
+    from app.services.event_consumers import register_builtin_consumers
+
+    register_builtin_consumers()
+    first = [name for name, _ in ev.CONSUMERS.get("ticket.status_changed", [])]
+    register_builtin_consumers()
+    second = [name for name, _ in ev.CONSUMERS.get("ticket.status_changed", [])]
+    assert "ticket_status_notify" in first
+    assert first == second  # re-registration must not duplicate consumers
+
