@@ -1,13 +1,23 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { api, setTokens, clearTokens, getAccessToken } from "./api";
+import { api, setTokens, clearTokens, getAccessToken, onSessionExpired } from "./api";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // When a request surfaces an unrecoverable 401 (expired session), drop the
+    // user state; RequireAuth then redirects to /login?next=…
+    onSessionExpired(() => {
+      clearTokens();
+      setUser(null);
+    });
+    return () => onSessionExpired(null);
+  }, []);
 
   useEffect(() => {
     async function init() {
