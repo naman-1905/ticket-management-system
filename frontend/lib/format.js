@@ -18,3 +18,14 @@ export function formatEntityType(entityType) {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(" ");
 }
+
+// "WAITING_FOR_CUSTOMER" -> "Waiting For Customer"
+export function formatStatus(status) {
+  if (!status) return "";
+
+  return status
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
