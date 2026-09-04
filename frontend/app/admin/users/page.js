@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import RequireAuth from "../../components/RequireAuth";
 import { api } from "../../../lib/api";
+import { ROLES } from "../../../lib/constants";
 import EmptyState from "../../components/ui/EmptyState";
 import PageHeader from "../../components/ui/PageHeader";
 import PageTransition from "../../components/ui/PageTransition";
@@ -16,20 +17,32 @@ function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  async function load() {
     try {
       setUsers(await api.listUsers());
+      setError("");
     } catch (err) {
       setError(err.message || "Failed to load users");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }
 
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    async function initialLoad() {
+      try {
+        setUsers(await api.listUsers());
+        if (!cancelled) setError("");
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Failed to load users");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    initialLoad();
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleRoleChange(userId, role) {
     setUpdatingId(userId);
@@ -68,13 +81,11 @@ function UsersPage() {
               onChange={(e) => handleRoleChange(u.id, e.target.value)}
               className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium shadow-none outline-none transition-colors hover:bg-muted focus:ring-2 focus:ring-primary/20"
             >
-              {["CUSTOMER", "CUSTOMER ADMIN", "AGENT", "SUPERVISOR", "ADMIN", "OWNER"].map(
-                (r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                )
-              )}
+              {ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {r.replace(/_/g, " ")}
+                </option>
+              ))}
             </Select>
           </div>
           ))}
