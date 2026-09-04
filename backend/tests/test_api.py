@@ -290,3 +290,96 @@ async def test_ticket_creation_idempotency(client):
     )
     assert r2.status_code in (200, 201)
     assert r2.json()["id"] == first["id"]
+
+
+@pytest.mark.asyncio
+async def test_attachment_download(client, db_session):
+    from app.security import create_access_token
+    from app.services.tenancy import assign_user_role
+
+    ac, user = client
+    session, _ = db_session
+    H = _auth(user)
+
+    r = await ac.post("/api/v1/tickets", json={"title": "Attachment ticket", "description": "desc"}, headers=H)
+    assert r.status_code == 201
+    tid = r.json()["id"]
+
+    files = {"file": ("notes.txt", b"hello-attachment", "text/plain")}
+    up = await ac.post(f"/api/v1/attachments/tickets/{tid}", files=files, headers=H)
+    assert up.status_code == 201, up.text
+    att = up.json()
+
+    dl = await ac.get(f"/api/v1/attachments/{att['id']}/download", headers=H)
+    assert dl.status_code == 200
+    assert dl.content == b"hello-attachment"
+    assert dl.headers["content-type"].startswith("text/plain")
+    assert 'filename="notes.txt"' in dl.headers["content-disposition"]
+
+    # A different user without access to the ticket cannot download its attachment.
+    outsider = User(
+        tenant_id=user.tenant_id,
+        email=f"outsider-{uuid.uuid4().hex[:8]}@test.com",
+        full_name="Outsider",
+        password_hash=hash_password("password123"),
+        role="CUSTOMER",
+        user_type="customer",
+    )
+    session.add(outsider)
+    await session.commit()
+    await assign_user_role(session, outsider, "CUSTOMER")
+    token = create_access_token(outsider.id, outsider.role, outsider.tenant_id)
+
+    forbidden = await ac.get(f"/api/v1/attachments/{att['id']}/download", headers={"Authorization": f"Bearer {token}"})
+    assert forbidden.status_code == 404
+
+    missing = await ac.get("/api/v1/attachments/00000000-0000-4000-8000-000000000000/download", headers=H)
+    assert missing.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_enriched_outbound_names(client, db_session):
+    from app.security import create_access_token
+    from app.services.tenancy import assign_user_role
+
+    ac, user = client
+    session, _ = db_session
+    H = _auth(user)
+
+    r = await ac.post("/api/v1/tickets", json={"title": "Names ticket", "description": "desc"}, headers=H)
+    assert r.status_code == 201
+    tid = r.json()["id"]
+    assert r.json().get("assignee_name") is None
+
+    c = await ac.post(f"/api/v1/tickets/{tid}/comments", json={"body": "first reply"}, headers=H)
+    assert c.status_code == 201, c.text
+    assert c.json()["author_name"] == user.full_name
+
+    agent = User(
+        tenant_id=user.tenant_id,
+        email=f"agent-{uuid.uuid4().hex[:8]}@test.com",
+        full_name="Agent Smith",
+        password_hash=hash_password("password123"),
+        role="AGENT",
+        user_type="staff",
+    )
+    session.add(agent)
+    await session.commit()
+    await assign_user_role(session, agent, "AGENT")
+    aH = {"Authorization": f"Bearer {create_access_token(agent.id, agent.role, agent.tenant_id)}"}
+
+    a = await ac.post(f"/api/v1/tickets/{tid}/assign", json={"assignee_id": str(agent.id)}, headers=aH)
+    assert a.status_code == 200, a.text
+    assert a.json()["assignee_name"] == "Agent Smith"
+
+    detail = await ac.get(f"/api/v1/tickets/{tid}", headers=H)
+    assert detail.status_code == 200
+    assert detail.json()["assignee_name"] == "Agent Smith"
+
+    listing = await ac.get("/api/v1/tickets", headers=H)
+    row = next(t for t in listing.json()["items"] if t["id"] == tid)
+    assert row["assignee_name"] == "Agent Smith"
+
+    comments = await ac.get(f"/api/v1/tickets/{tid}/comments", headers=aH)
+    assert comments.status_code == 200
+    assert [c["author_name"] for c in comments.json()] == ["Owner"]
