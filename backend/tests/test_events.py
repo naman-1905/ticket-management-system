@@ -144,7 +144,7 @@ async def test_relay_delivers_and_marks_published(db_session):
         state["ran"] += 1
 
     register_consumer("ticket.created", "test_ok", ok_handler)
-    await emit_event(session, user.tenant_id, "ticket.created", "ticket", None, {"ticket_id": "x"})
+    await emit_event(session, user.tenant_id, "ticket.created", "ticket", None, {"ticket_id": "x", "ticket_number": "TCK-TEST"})
     await session.commit()
 
     await relay_events(session)
@@ -154,7 +154,7 @@ async def test_relay_delivers_and_marks_published(db_session):
     delivery = (
         await session.execute(select(EventDelivery).where(EventDelivery.consumer_name == "test_ok"))
     ).scalar_one()
-    assert delivery.status == "success"
+    assert delivery.status == "delivered"
     assert state["ran"] == 1
 
 
@@ -166,7 +166,7 @@ async def test_relay_schedules_retry_on_failure(db_session):
         raise RuntimeError("boom")
 
     register_consumer("ticket.created", "test_fail_retry", fail_handler)
-    await emit_event(session, user.tenant_id, "ticket.created", "ticket", None, {"ticket_id": "x"})
+    await emit_event(session, user.tenant_id, "ticket.created", "ticket", None, {"ticket_id": "x", "ticket_number": "TCK-TEST"})
     await session.commit()
 
     await relay_events(session)
@@ -177,7 +177,7 @@ async def test_relay_schedules_retry_on_failure(db_session):
         )
     ).scalar_one()
     assert delivery.attempts == 1
-    assert delivery.status == "pending"
+    assert delivery.status == "failed"
     assert delivery.next_attempt_at is not None
     assert delivery.last_error is not None
 
@@ -190,8 +190,11 @@ async def test_relay_dead_letters_after_max_attempts(db_session):
         raise RuntimeError("boom")
 
     register_consumer("ticket.created", "test_fail_dl", fail_handler)
-    await emit_event(session, user.tenant_id, "ticket.created", "ticket", None, {"ticket_id": "x"})
+    await emit_event(session, user.tenant_id, "ticket.created", "ticket", None, {"ticket_id": "x", "ticket_number": "TCK-TEST"})
     await session.commit()
+
+    # First pass creates the delivery and records one failed attempt.
+    await relay_events(session)
 
     delivery = (
         await session.execute(select(EventDelivery).where(EventDelivery.consumer_name == "test_fail_dl"))
@@ -253,7 +256,7 @@ async def test_events_and_dead_letter_endpoints(client, db_session):
     session, _ = db_session
     H = _auth(user)
 
-    await emit_event(session, user.tenant_id, "ticket.created", "ticket", None, {"ticket_id": "x"})
+    await emit_event(session, user.tenant_id, "ticket.created", "ticket", None, {"ticket_id": "x", "ticket_number": "TCK-TEST"})
     await session.commit()
 
     res = await ac.get("/api/v1/events", headers=H)
