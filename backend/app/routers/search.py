@@ -36,4 +36,4 @@ async def search_tickets(
     rows = (
         await db.execute(query.order_by(Ticket.created_at.desc()).offset((page - 1) * size).limit(size))
     ).scalars().all()
-    return Page(items=[_ticket_out(t, user) for t in rows], total=total or 0, page=page, size=size)
+    return Page(items=[await _ticket_out(db, t, user) for t in rows], total=total or 0, page=page, size=size)
