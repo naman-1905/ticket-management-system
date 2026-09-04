@@ -118,6 +118,7 @@ class TicketOut(BaseModel):
     requester_contact_id: uuid.UUID | None = None
     organization_id: uuid.UUID | None = None
     assignee_id: uuid.UUID | None
+    assignee_name: str | None = None
     team_id: uuid.UUID | None = None
     queue_id: uuid.UUID | None = None
     version: int = 1
@@ -139,6 +140,7 @@ class CommentOut(BaseModel):
     id: uuid.UUID
     ticket_id: uuid.UUID
     author_id: uuid.UUID
+    author_name: str | None = None
     body: str
     is_internal: bool
     created_at: datetime
