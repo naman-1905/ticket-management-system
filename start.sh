@@ -3,36 +3,15 @@
 set -e
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-BACKEND_DIR="$PROJECT_ROOT/backend"
-FRONTEND_DIR="$PROJECT_ROOT/frontend"
 
 echo "Starting Ticket Management System..."
 
 # Backend
-if [ ! -d "$BACKEND_DIR/.venv" ]; then
-    echo "Backend virtual environment not found."
-    echo "Create it first with:"
-    echo "  python3 -m venv backend/.venv"
-    exit 1
-fi
-
-source "$BACKEND_DIR/.venv/bin/activate"
-
-echo "Starting FastAPI backend on http://127.0.0.1:8000..."
-(
-    cd "$BACKEND_DIR"
-    python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-) &
-
+"$PROJECT_ROOT/backend/start-backend.sh" &
 BACKEND_PID=$!
 
 # Frontend
-echo "Starting Next.js frontend on http://localhost:3000..."
-(
-    cd "$FRONTEND_DIR"
-    npm run dev
-) &
-
+"$PROJECT_ROOT/frontend/start-frontend.sh" &
 FRONTEND_PID=$!
 
 cleanup() {
