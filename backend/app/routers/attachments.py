@@ -1,6 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +11,7 @@ from ..schemas import AttachmentOut
 from ..deps import current_user
 from ..services.tickets import get_ticket_for_user
 from ..storage.local import LocalStorage
+from ..utils import err
 
 router = APIRouter()
 storage = LocalStorage()
@@ -26,8 +28,6 @@ async def upload_attachment(
     ticket = await get_ticket_for_user(db, ticket_id, user)
     data = await file.read()
     if len(data) > MAX_SIZE:
-        from ..utils import err
-
         err(400, "VALIDATION_ERROR", "File too large")
     key, checksum = storage.save(user.tenant_id, file.filename or "upload", data)
     att = Attachment(
@@ -44,6 +44,36 @@ async def upload_attachment(
     await db.commit()
     await db.refresh(att)
     return att
+
+
+@router.get("/{attachment_id}/download")
+async def download_attachment(
+    attachment_id: uuid.UUID,
+    user=Depends(current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    att = (
+        await db.execute(
+            select(Attachment).where(
+                Attachment.id == attachment_id,
+                Attachment.tenant_id == user.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not att:
+        err(404, "NOT_FOUND", "Attachment not found")
+    # Same access rule as upload/list: the caller must be able to view the parent ticket.
+    await get_ticket_for_user(db, att.ticket_id, user)
+    try:
+        data = storage.read(att.storage_key)
+    except (FileNotFoundError, OSError):
+        err(410, "GONE", "Attachment file is no longer available")
+    safe_name = att.filename.replace('"', "'")
+    return Response(
+        content=data,
+        media_type=att.mime_type or "application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+    )
 
 
 @router.get("/tickets/{ticket_id}", response_model=list[AttachmentOut])
