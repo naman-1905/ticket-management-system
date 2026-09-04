@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { motion } from "framer-motion";
@@ -17,9 +17,8 @@ import Spinner from "../components/ui/Spinner";
 import { ListPanel } from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import { api } from "../../lib/api";
-
-const STATUSES = ["OPEN", "IN_PROGRESS", "ON_HOLD", "RESOLVED", "CLOSED"];
-const PRIORITIES = ["P1", "P2", "P3", "P4"];
+import { TICKET_STATUSES, TICKET_PRIORITIES } from "../../lib/constants";
+import { formatStatus } from "../../lib/format";
 
 function TicketsPage() {
   const [items, setItems] = useState([]);
@@ -41,23 +40,25 @@ function TicketsPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await api.listTickets({ page, size, status, priority, q: query });
-      setItems(data.items);
-      setTotal(data.total);
-    } catch (err) {
-      setError(err.message || "Failed to load tickets");
-    } finally {
-      setLoading(false);
-    }
-  }, [page, size, status, priority, query]);
-
   useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const data = await api.listTickets({ page, size, status, priority, q: query });
+        if (!cancelled) {
+          setItems(data.items);
+          setTotal(data.total);
+          setError("");
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Failed to load tickets");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
     load();
-  }, [load]);
+    return () => { cancelled = true; };
+  }, [page, size, status, priority, query]);
 
   const totalPages = Math.max(1, Math.ceil(total / size));
 
@@ -94,9 +95,9 @@ function TicketsPage() {
           className="rounded-full px-4"
         >
           <option value="">All statuses</option>
-          {STATUSES.map((s) => (
+          {TICKET_STATUSES.map((s) => (
             <option key={s} value={s}>
-              {s.replace("_", " ")}
+              {formatStatus(s)}
             </option>
           ))}
         </Select>
@@ -109,7 +110,7 @@ function TicketsPage() {
           className="rounded-full px-4"
         >
           <option value="">All priorities</option>
-          {PRIORITIES.map((p) => (
+          {TICKET_PRIORITIES.map((p) => (
             <option key={p} value={p}>
               {p}
             </option>
@@ -134,6 +135,9 @@ function TicketsPage() {
                     <PriorityBadge priority={t.priority} />
                   </div>
                   <p className="truncate font-medium text-foreground">{t.title}</p>
+                  {t.assignee_name && (
+                    <p className="truncate text-xs text-muted-foreground">Assigned to {t.assignee_name}</p>
+                  )}
                 </div>
                 <StatusBadge status={t.status} />
               </Link>
