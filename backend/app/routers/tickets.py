@@ -33,7 +33,14 @@ from ..utils import err
 router = APIRouter()
 
 
-def _ticket_out(ticket: Ticket, user: User) -> TicketOut:
+async def _ticket_out(db: AsyncSession, ticket: Ticket, user: User) -> TicketOut:
+  assignee_name = None
+  if ticket.assignee_id:
+    assignee_name = await db.scalar(select(User.full_name).where(User.id == ticket.assignee_id))
+  return _ticket_out_sync(ticket, user, assignee_name)
+
+
+def _ticket_out_sync(ticket: Ticket, user: User, assignee_name: str | None = None) -> TicketOut:
   allowed = get_allowed_transitions(user.role, ticket.status)
   return TicketOut(
       id=ticket.id,
@@ -51,6 +58,7 @@ def _ticket_out(ticket: Ticket, user: User) -> TicketOut:
       requester_contact_id=ticket.requester_contact_id,
       organization_id=ticket.organization_id,
       assignee_id=ticket.assignee_id,
+      assignee_name=assignee_name,
       team_id=ticket.team_id,
       queue_id=ticket.queue_id,
       version=ticket.version,
@@ -88,7 +96,7 @@ async def create_ticket_endpoint(
     )
     await db.commit()
     await db.refresh(ticket)
-    return _ticket_out(ticket, user)
+    return await _ticket_out(db, ticket, user)
 
 
 @router.get("", response_model=Page[TicketOut])
@@ -132,13 +140,16 @@ async def list_tickets(
     rows = (
         await db.execute(query.order_by(Ticket.created_at.desc()).offset((page - 1) * size).limit(size))
     ).scalars().all()
-    return Page(items=[_ticket_out(t, user) for t in rows], total=total or 0, page=page, size=size)
+    return Page(
+        items=[await _ticket_out(db, t, user) for t in rows],
+        total=total or 0, page=page, size=size,
+    )
 
 
 @router.get("/{ticket_id}", response_model=TicketOut)
 async def get_one(ticket_id: uuid.UUID, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     ticket = await get_ticket_for_user(db, ticket_id, user)
-    return _ticket_out(ticket, user)
+    return await _ticket_out(db, ticket, user)
 
 
 @router.post("/{ticket_id}/transitions", response_model=TicketOut)
@@ -155,7 +166,7 @@ async def transition(
     ticket = await transition_ticket(db, user, ticket, body.to_status, request_id=getattr(request.state, "request_id", None))
     await db.commit()
     await db.refresh(ticket)
-    return _ticket_out(ticket, user)
+    return await _ticket_out(db, ticket, user)
 
 
 @router.patch("/{ticket_id}/status", response_model=TicketOut)
@@ -170,7 +181,7 @@ async def change_status_legacy(
     ticket = await transition_ticket(db, user, ticket, body.status, request_id=getattr(request.state, "request_id", None))
     await db.commit()
     await db.refresh(ticket)
-    return _ticket_out(ticket, user)
+    return await _ticket_out(db, ticket, user)
 
 
 @router.post("/{ticket_id}/assign", response_model=TicketOut)
@@ -212,7 +223,21 @@ async def assign(
     ticket.version += 1
     await db.commit()
     await db.refresh(ticket)
-    return _ticket_out(ticket, user)
+    return await _ticket_out(db, ticket, user)
+
+
+async def _comment_out(db: AsyncSession, comment: Comment) -> dict:
+    """Serialize a comment with its author's display name."""
+    author = await db.scalar(select(User.full_name).where(User.id == comment.author_id))
+    return {
+        "id": comment.id,
+        "ticket_id": comment.ticket_id,
+        "author_id": comment.author_id,
+        "author_name": author,
+        "body": comment.body,
+        "is_internal": comment.is_internal,
+        "created_at": comment.created_at,
+    }
 
 
 @router.get("/{ticket_id}/comments", response_model=list[CommentOut])
@@ -221,7 +246,22 @@ async def comments(ticket_id: uuid.UUID, user=Depends(current_user), db: AsyncSe
     q = select(Comment).where(Comment.ticket_id == ticket.id, Comment.tenant_id == user.tenant_id).order_by(Comment.created_at)
     if not await user_has_permission(db, user, "comment.internal.read"):
         q = q.where(Comment.is_internal == False)  # noqa: E712
-    return (await db.execute(q)).scalars().all()
+    rows = (await db.execute(q)).scalars().all()
+    author_ids = {c.author_id for c in rows}
+    names = {}
+    if author_ids:
+        pairs = (
+            await db.execute(select(User.id, User.full_name).where(User.id.in_(author_ids)))
+        ).all()
+        names = {uid: name for uid, name in pairs}
+    return [
+        CommentOut(
+            id=c.id, ticket_id=c.ticket_id, author_id=c.author_id,
+            author_name=names.get(c.author_id), body=c.body,
+            is_internal=c.is_internal, created_at=c.created_at,
+        )
+        for c in rows
+    ]
 
 
 @router.post("/{ticket_id}/comments", response_model=CommentOut, status_code=201)
@@ -239,7 +279,7 @@ async def add_comment_endpoint(
     comment = await add_comment(db, user, ticket, body.body, body.is_internal, idempotency_key)
     await db.commit()
     await db.refresh(comment)
-    return comment
+    return await _comment_out(db, comment)
 
 
 @router.post("/bulk", response_model=dict)
