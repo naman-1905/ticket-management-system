@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
 import RequireAuth from "../../components/RequireAuth";
@@ -15,8 +15,7 @@ import { Card } from "../../components/ui/Card";
 import CSATWidget from "../../components/CSATWidget";
 import { useAuth } from "../../../lib/auth-context";
 import { api } from "../../../lib/api";
-
-const STATUSES = ["OPEN", "IN_PROGRESS", "ON_HOLD", "RESOLVED", "CLOSED"];
+import { formatStatus } from "../../../lib/format";
 
 import { hasPermission } from "../../../lib/permissions";
 
@@ -40,25 +39,27 @@ function TicketDetail() {
   const canManage = hasPermission(user, "ticket.transition") || hasPermission(user, "ticket.assign");
   const canInternal = hasPermission(user, "comment.internal.write");
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const [t, c, s] = await Promise.all([api.getTicket(id), api.listComments(id), api.getTicketSla(id)]);
-      setTicket(t);
-      setComments(c);
-      setSla(s);
-      if (hasPermission(user, "ticket.assign")) setAgents(await api.listAgents());
-    } catch (err) {
-      setError(err.message || "Failed to load ticket");
-    } finally {
-      setLoading(false);
-    }
-  }, [id, user]);
-
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    async function initialLoad() {
+      try {
+        const [t, c, s] = await Promise.all([api.getTicket(id), api.listComments(id), api.getTicketSla(id)]);
+        if (!cancelled) {
+          setTicket(t);
+          setComments(c);
+          setSla(s);
+          setError("");
+        }
+        if (!cancelled && hasPermission(user, "ticket.assign")) setAgents(await api.listAgents());
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Failed to load ticket");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    initialLoad();
+    return () => { cancelled = true; };
+  }, [id, user]);
 
   useEffect(() => {
     api.listMacros().then(setMacros).catch(() => {});
@@ -138,6 +139,11 @@ function TicketDetail() {
           </div>
         </div>
         <h1 className="mb-2 text-xl font-semibold tracking-tight text-foreground">{ticket.title}</h1>
+        {ticket.assignee_name && (
+          <p className="mb-3 text-sm text-muted-foreground">
+            Assigned to <span className="font-medium text-foreground">{ticket.assignee_name}</span>
+          </p>
+        )}
         <p className="mb-4 whitespace-pre-wrap text-sm text-muted-foreground">{ticket.description}</p>
 
         <div className="flex flex-wrap items-center gap-4 border-t border-border pt-4 text-sm">
@@ -149,10 +155,10 @@ function TicketDetail() {
               onChange={(e) => handleStatusChange(e.target.value)}
               className="rounded-full px-3 py-1.5"
             >
-              <option value={ticket.status}>{ticket.status.replace(/_/g, " ")}</option>
+              <option value={ticket.status}>{formatStatus(ticket.status)}</option>
               {ticket.allowed_transitions.map((s) => (
                 <option key={s} value={s}>
-                  {s.replace(/_/g, " ")}
+                  {formatStatus(s)}
                 </option>
               ))}
             </Select>
@@ -204,11 +210,14 @@ function TicketDetail() {
             }`}
           >
             <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium text-foreground">{c.author_name || "Unknown"}</span>
               <span className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString()}</span>
-              {c.is_internal && (
-                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Internal note</span>
-              )}
             </div>
+            {c.is_internal && (
+              <div className="mb-1">
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Internal note</span>
+              </div>
+            )}
             <p className="whitespace-pre-wrap text-foreground">{c.body}</p>
           </motion.div>
         ))}
