@@ -299,6 +299,7 @@ async def add_comment(
 def ticket_to_dict(ticket: Ticket, allowed: list[str] | None = None) -> dict:
     return {
         "id": str(ticket.id),
+        "tenant_id": str(ticket.tenant_id),
         "ticket_number": ticket.ticket_number,
         "title": ticket.title,
         "description": ticket.description,
