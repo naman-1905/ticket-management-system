@@ -44,10 +44,12 @@ ticket-management-system/
 │   ├── scripts/          # Bootstrap and maintenance scripts
 │   ├── tests/
 │   ├── requirements.txt
+│   ├── start-backend.sh
 │   └── .env.example
 ├── frontend/
 │   ├── app/              # Next.js App Router pages
 │   ├── lib/              # API client, auth, permissions
+│   ├── start-frontend.sh
 │   └── .env.example
 ├── docker-compose.yml
 ├── start.bat
@@ -168,6 +170,13 @@ start.bat
 
 ```bash
 chmod +x start.sh && ./start.sh
+```
+
+Or run each service in its own terminal:
+
+```bash
+./backend/start-backend.sh    # FastAPI on :8000
+./frontend/start-frontend.sh  # Next.js on :3000
 ```
 
 ## Frontend Pages
