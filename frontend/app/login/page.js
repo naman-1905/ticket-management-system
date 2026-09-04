@@ -33,7 +33,13 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const me = await login(email, password);
-      router.push(homeForUser(me));
+      // Return to the page the user was on before the session-expiry redirect.
+      const next = new URLSearchParams(window.location.search).get("next");
+      if (next && next.startsWith("/") && !next.startsWith("//")) {
+        router.push(next);
+      } else {
+        router.push(homeForUser(me));
+      }
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {
