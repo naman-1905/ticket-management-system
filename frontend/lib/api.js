@@ -20,6 +20,18 @@ function clearTokens() {
   localStorage.removeItem("refresh_token");
 }
 
+// Registered by the auth provider so a dead session (401 that cannot be fixed by a
+// token refresh) clears user state; gated pages then redirect to /login?next=…
+let sessionExpiredHandler = null;
+
+export function onSessionExpired(callback) {
+  sessionExpiredHandler = callback;
+}
+
+function notifySessionExpired() {
+  if (sessionExpiredHandler) sessionExpiredHandler();
+}
+
 export class ApiError extends Error {
   constructor(code, message, status, details) {
     super(message);
@@ -75,9 +87,13 @@ async function request(path, { method = "GET", body, headers = {}, auth = true, 
   }
 
   if (!res.ok) {
-    if (res.status === 401 && auth && retry && getRefreshToken() && !path.startsWith("/auth/")) {
-      const refreshed = await tryRefresh();
-      if (refreshed) return request(path, { method, body, headers, auth, retry: false });
+    if (res.status === 401 && auth && !path.startsWith("/auth/")) {
+      if (retry && getRefreshToken()) {
+        const refreshed = await tryRefresh();
+        if (refreshed) return request(path, { method, body, headers, auth, retry: false });
+      }
+      // No refresh token available, or the refresh itself was rejected: the session is over.
+      notifySessionExpired();
     }
     throw parseError(data, res.status);
   }
