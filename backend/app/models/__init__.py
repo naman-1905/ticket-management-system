@@ -165,6 +165,19 @@ class Tag(Base):
     __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_tag_tenant_name"),)
 
 
+class Project(Base):
+    __tablename__ = "projects"
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    color: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
+    __table_args__ = (UniqueConstraint("tenant_id", "name", name="uq_project_tenant_name"),)
+
+
 class Ticket(Base):
     __tablename__ = "tickets"
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -184,6 +197,7 @@ class Ticket(Base):
     assignee_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True, index=True)
     team_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("teams.id"), nullable=True, index=True)
     queue_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("queues.id"), nullable=True, index=True)
+    project_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True)
     created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     custom_fields: Mapped[dict] = mapped_column(JSON, default=dict)
     version: Mapped[int] = mapped_column(Integer, default=1)
