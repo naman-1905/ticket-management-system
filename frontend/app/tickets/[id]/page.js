@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { motion } from "framer-motion";
+import { XCircle } from "lucide-react";
 import RequireAuth from "../../components/RequireAuth";
 import StatusBadge from "../../components/StatusBadge";
 import PriorityBadge from "../../components/PriorityBadge";
 import Button from "../../components/ui/Button";
+import Input from "../../components/ui/Input";
 import PageTransition from "../../components/ui/PageTransition";
 import Select from "../../components/ui/Select";
 import Spinner from "../../components/ui/Spinner";
@@ -15,9 +17,18 @@ import { Card } from "../../components/ui/Card";
 import CSATWidget from "../../components/CSATWidget";
 import { useAuth } from "../../../lib/auth-context";
 import { api } from "../../../lib/api";
-import { formatStatus } from "../../../lib/format";
+import { formatStatus, formatCategory, formatDate } from "../../../lib/format";
+import { TICKET_CATEGORIES } from "../../../lib/constants";
 
 import { hasPermission } from "../../../lib/permissions";
+
+function toLocalInput(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 function TicketDetail() {
   const { id } = useParams();
@@ -34,10 +45,17 @@ function TicketDetail() {
   const [posting, setPosting] = useState(false);
   const [statusUpdating, setStatusUpdating] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [closing, setClosing] = useState(false);
   const [macros, setMacros] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [editCategory, setEditCategory] = useState("");
+  const [editProjectId, setEditProjectId] = useState("");
+  const [editDueAt, setEditDueAt] = useState("");
+  const [savingMeta, setSavingMeta] = useState(false);
 
   const canManage = hasPermission(user, "ticket.transition") || hasPermission(user, "ticket.assign");
   const canInternal = hasPermission(user, "comment.internal.write");
+  const canEditMeta = hasPermission(user, "ticket.update");
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +82,18 @@ function TicketDetail() {
   useEffect(() => {
     api.listMacros().then(setMacros).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (canEditMeta) api.listProjects().then(setProjects).catch(() => {});
+  }, [canEditMeta]);
+
+  // Initialise the metadata edit fields when a ticket is loaded.
+  useEffect(() => {
+    if (!ticket) return;
+    setEditCategory(ticket.category || "");
+    setEditProjectId(ticket.project_id || "");
+    setEditDueAt(toLocalInput(ticket.due_at));
+  }, [ticket?.id]);
 
   async function handleStatusChange(newStatus) {
     setStatusUpdating(true);
@@ -107,6 +137,40 @@ function TicketDetail() {
       setError(err.message || "Failed to add comment");
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function handleCloseTicket() {
+    if (!confirm("Close this ticket? The customer will be notified.")) return;
+    setClosing(true);
+    setError("");
+    try {
+      const updated = ticket.allowed_transitions?.length
+        ? await api.transitionTicket(id, "CLOSED", ticket.version)
+        : await api.updateTicketStatus(id, "CLOSED");
+      setTicket(updated);
+    } catch (err) {
+      setError(err.message || "Failed to close ticket");
+    } finally {
+      setClosing(false);
+    }
+  }
+
+  async function handleSaveMeta() {
+    setSavingMeta(true);
+    setError("");
+    try {
+      const payload = {
+        category: editCategory || null,
+        project_id: editProjectId || null,
+        due_at: editDueAt ? new Date(editDueAt).toISOString() : null,
+      };
+      const updated = await api.updateTicket(id, payload);
+      setTicket(updated);
+    } catch (err) {
+      setError(err.message || "Failed to update details");
+    } finally {
+      setSavingMeta(false);
     }
   }
 
@@ -190,6 +254,63 @@ function TicketDetail() {
         </div>
       </Card>
 
+      <Card className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">Details</h2>
+          {canEditMeta && (
+            <Button type="button" variant="secondary" onClick={handleSaveMeta} disabled={savingMeta}>
+              {savingMeta ? "Saving…" : "Save details"}
+            </Button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            {canEditMeta ? (
+              <Select label="Category" value={editCategory} onChange={(e) => setEditCategory(e.target.value)}>
+                <option value="">No category</option>
+                {TICKET_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <>
+                <span className="mb-1.5 block text-sm font-medium text-muted-foreground">Category</span>
+                <p className="text-sm text-foreground">{formatCategory(ticket.category) || "—"}</p>
+              </>
+            )}
+          </div>
+          <div>
+            {canEditMeta ? (
+              <Select label="Project" value={editProjectId} onChange={(e) => setEditProjectId(e.target.value)}>
+                <option value="">No project</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <>
+                <span className="mb-1.5 block text-sm font-medium text-muted-foreground">Project</span>
+                <p className="text-sm text-foreground">{ticket.project_name || "—"}</p>
+              </>
+            )}
+          </div>
+          <div>
+            {canEditMeta ? (
+              <Input label="Deadline" type="datetime-local" value={editDueAt} onChange={(e) => setEditDueAt(e.target.value)} />
+            ) : (
+              <>
+                <span className="mb-1.5 block text-sm font-medium text-muted-foreground">Deadline</span>
+                <p className="text-sm text-foreground">{formatDate(ticket.due_at) || "—"}</p>
+              </>
+            )}
+          </div>
+        </div>
+      </Card>
+
       {(ticket.status === "RESOLVED" || ticket.status === "CLOSED") && (
         <CSATWidget ticketId={id} />
       )}
@@ -262,9 +383,23 @@ function TicketDetail() {
             ) : (
               <span />
             )}
-            <Button type="submit" disabled={posting}>
-              {posting ? "Posting…" : "Add comment"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {hasPermission(user, "ticket.transition") && ticket.status !== "CLOSED" && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleCloseTicket}
+                  disabled={closing}
+                  className="gap-1.5"
+                >
+                  <XCircle size={16} strokeWidth={2} />
+                  {closing ? "Closing…" : "Close ticket"}
+                </Button>
+              )}
+              <Button type="submit" disabled={posting}>
+                {posting ? "Posting…" : "Add comment"}
+              </Button>
+            </div>
           </div>
         </form>
       </Card>
