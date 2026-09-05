@@ -24,3 +24,13 @@ export const ROLES = [
   "ADMIN",
   "OWNER",
 ];
+
+// Standard ticket categories. Tickets store `category` as free text, so this is a
+// curated default set for dropdowns; any value the backend accepts still displays.
+export const TICKET_CATEGORIES = [
+  { value: "bug", label: "Bug" },
+  { value: "feature-request", label: "Feature Request" },
+  { value: "support", label: "Support" },
+  { value: "question", label: "Question" },
+  { value: "other", label: "Other" },
+];
