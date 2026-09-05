@@ -97,6 +97,24 @@ async def update_policy(
     return p
 
 
+@router.delete("/sla/policies/{policy_id}", status_code=204)
+async def delete_policy(
+    policy_id: uuid.UUID,
+    user=Depends(require_permissions("sla.manage")),
+    db: AsyncSession = Depends(get_db),
+):
+    p = (
+        await db.execute(
+            select(SLAPolicy).where(SLAPolicy.id == policy_id, SLAPolicy.tenant_id == user.tenant_id)
+        )
+    ).scalar_one_or_none()
+    if not p:
+        err(404, "NOT_FOUND", "SLA policy not found")
+    await audit_log(db, user, "sla.policy_deleted", "sla_policy", p.id, old_values={"name": p.name, "priority": p.priority})
+    await db.delete(p)
+    await db.commit()
+
+
 @router.get("/tickets/{ticket_id}/sla", response_model=TicketSLAOut | dict)
 async def ticket_sla(ticket_id: uuid.UUID, user=Depends(current_user), db: AsyncSession = Depends(get_db)):
     t = await get_ticket_for_user(db, ticket_id, user)
