@@ -5,13 +5,14 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
-from ..models import Ticket, Comment, User, Team, Queue
+from ..models import Ticket, Comment, User, Team, Queue, Project
 from ..schemas import (
     TicketCreate,
     TicketOut,
     TicketTransition,
     TicketStatus,
     Assignment,
+    TicketUpdate,
     CommentCreate,
     CommentOut,
     Page,
@@ -24,6 +25,7 @@ from ..services.tickets import (
     get_ticket_for_user,
     transition_ticket,
     add_comment,
+    update_ticket,
     ticket_to_dict,
 )
 from ..services.tenancy import user_has_permission
@@ -37,10 +39,13 @@ async def _ticket_out(db: AsyncSession, ticket: Ticket, user: User) -> TicketOut
   assignee_name = None
   if ticket.assignee_id:
     assignee_name = await db.scalar(select(User.full_name).where(User.id == ticket.assignee_id))
-  return _ticket_out_sync(ticket, user, assignee_name)
+  project_name = None
+  if ticket.project_id:
+    project_name = await db.scalar(select(Project.name).where(Project.id == ticket.project_id))
+  return _ticket_out_sync(ticket, user, assignee_name, project_name)
 
 
-def _ticket_out_sync(ticket: Ticket, user: User, assignee_name: str | None = None) -> TicketOut:
+def _ticket_out_sync(ticket: Ticket, user: User, assignee_name: str | None = None, project_name: str | None = None) -> TicketOut:
   allowed = get_allowed_transitions(user.role, ticket.status)
   return TicketOut(
       id=ticket.id,
@@ -61,6 +66,9 @@ def _ticket_out_sync(ticket: Ticket, user: User, assignee_name: str | None = Non
       assignee_name=assignee_name,
       team_id=ticket.team_id,
       queue_id=ticket.queue_id,
+      project_id=ticket.project_id,
+      project_name=project_name,
+      due_at=ticket.due_at,
       version=ticket.version,
       created_at=ticket.created_at,
       updated_at=ticket.updated_at,
@@ -81,6 +89,14 @@ async def create_ticket_endpoint(
     cached = await get_idempotent(db, user, "POST:/tickets", idempotency_key)
     if cached:
         return cached
+    project_id = body.project_id
+    if project_id:
+        proj = (
+            await db.execute(select(Project).where(Project.id == project_id, Project.tenant_id == user.tenant_id))
+        ).scalar_one_or_none()
+        if not proj:
+            err(404, "NOT_FOUND", "Project not found")
+        project_id = proj.id
     ticket = await create_ticket(
         db,
         user,
@@ -92,6 +108,8 @@ async def create_ticket_endpoint(
         source=body.source,
         organization_id=body.organization_id,
         requester_contact_id=body.requester_contact_id,
+        due_at=body.due_at,
+        project_id=project_id,
         idempotency_key=idempotency_key,
     )
     await db.commit()
@@ -107,6 +125,8 @@ async def list_tickets(
     priority: str | None = None,
     category: str | None = None,
     assignee_id: uuid.UUID | None = None,
+    project_id: uuid.UUID | None = None,
+    participant_id: uuid.UUID | None = None,
     q: str | None = None,
     user=Depends(current_user),
     db: AsyncSession = Depends(get_db),
@@ -127,6 +147,12 @@ async def list_tickets(
         query = query.where(Ticket.category == category)
     if assignee_id:
         query = query.where(Ticket.assignee_id == assignee_id)
+    if project_id:
+        query = query.where(Ticket.project_id == project_id)
+    if participant_id:
+        # Filter tickets where the given user has a comment (replied/worked on it)
+        participant_subq = select(Comment.ticket_id).where(Comment.author_id == participant_id)
+        query = query.where(Ticket.id.in_(participant_subq))
     if q:
         like = f"%{q.lower()}%"
         query = query.where(
@@ -221,6 +247,33 @@ async def assign(
             err(404, "NOT_FOUND", "Queue not found")
         ticket.queue_id = queue.id
     ticket.version += 1
+    await db.commit()
+    await db.refresh(ticket)
+    return await _ticket_out(db, ticket, user)
+
+
+@router.patch("/{ticket_id}", response_model=TicketOut)
+async def update_ticket_endpoint(
+    ticket_id: uuid.UUID,
+    body: TicketUpdate,
+    request: Request,
+    user=Depends(require_permissions("ticket.update")),
+    db: AsyncSession = Depends(get_db),
+):
+    ticket = await get_ticket_for_user(db, ticket_id, user)
+    changes = body.model_dump(exclude_unset=True)
+    if "project_id" in changes and changes["project_id"] is not None:
+        proj = (
+            await db.execute(
+                select(Project).where(Project.id == changes["project_id"], Project.tenant_id == user.tenant_id)
+            )
+        ).scalar_one_or_none()
+        if not proj:
+            err(404, "NOT_FOUND", "Project not found")
+        changes["project_id"] = proj.id
+    ticket = await update_ticket(
+        db, user, ticket, changes=changes, request_id=getattr(request.state, "request_id", None)
+    )
     await db.commit()
     await db.refresh(ticket)
     return await _ticket_out(db, ticket, user)
