@@ -148,6 +148,7 @@ export const api = {
     request(`/tickets/${id}/transitions`, { method: "POST", body: { to_status, version } }),
   updateTicketStatus: (id, status) => request(`/tickets/${id}/status`, { method: "PATCH", body: { status } }),
   assignTicket: (id, payload) => request(`/tickets/${id}/assign`, { method: "POST", body: payload }),
+  updateTicket: (id, payload) => request(`/tickets/${id}`, { method: "PATCH", body: payload }),
   bulkTickets: (payload) => request("/tickets/bulk", { method: "POST", body: payload }),
 
   listComments: (ticketId) => request(`/tickets/${ticketId}/comments`),
@@ -158,6 +159,7 @@ export const api = {
   listSlaPolicies: () => request("/sla/policies"),
   createSlaPolicy: (payload) => request("/sla/policies", { method: "POST", body: payload }),
   updateSlaPolicy: (id, payload) => request(`/sla/policies/${id}`, { method: "PATCH", body: payload }),
+  deleteSlaPolicy: (id) => request(`/sla/policies/${id}`, { method: "DELETE" }),
 
   listAuditLogs: (params = {}) => request(`/audit/logs${toQueryString(params)}`),
 
@@ -172,10 +174,16 @@ export const api = {
   listQueues: () => request("/queues"),
   createQueue: (payload) => request("/queues", { method: "POST", body: payload }),
 
+  listProjects: () => request("/projects"),
+  createProject: (payload) => request("/projects", { method: "POST", body: payload }),
+  updateProject: (id, payload) => request(`/projects/${id}`, { method: "PATCH", body: payload }),
+  deleteProject: (id) => request(`/projects/${id}`, { method: "DELETE" }),
+
   listNotifications: () => request("/notifications"),
   markNotificationsRead: () => request("/notifications/read-all", { method: "POST" }),
 
   reportSummary: () => request("/reports/tickets/summary"),
+  dashboardData: () => request("/reports/tickets/dashboard"),
 
   listKBArticles: () => request("/kb/articles"),
   createKBArticle: (payload) => request("/kb/articles", { method: "POST", body: payload }),
