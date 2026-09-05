@@ -84,6 +84,8 @@ class TicketCreate(BaseModel):
     source: str = Field(default="WEB", max_length=32)
     organization_id: uuid.UUID | None = None
     requester_contact_id: uuid.UUID | None = None
+    due_at: datetime | None = None
+    project_id: uuid.UUID | None = None
 
 
 class TicketTransition(BaseModel):
@@ -99,6 +101,29 @@ class Assignment(BaseModel):
     assignee_id: uuid.UUID | None = None
     team_id: uuid.UUID | None = None
     queue_id: uuid.UUID | None = None
+
+
+class TicketUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    description: str | None = None
+    priority: str | None = Field(default=None, pattern="^P[1-4]$")
+    category: str | None = Field(default=None, max_length=50)
+    project_id: uuid.UUID | None = None
+    due_at: datetime | None = None
+
+
+class ProjectIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    description: str | None = None
+    color: str | None = Field(default=None, max_length=32)
+
+
+class ProjectOut(ProjectIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    is_active: bool
+    created_at: datetime
 
 
 class TicketOut(BaseModel):
@@ -121,6 +146,9 @@ class TicketOut(BaseModel):
     assignee_name: str | None = None
     team_id: uuid.UUID | None = None
     queue_id: uuid.UUID | None = None
+    project_id: uuid.UUID | None = None
+    project_name: str | None = None
+    due_at: datetime | None = None
     version: int = 1
     created_at: datetime
     updated_at: datetime | None = None
@@ -326,6 +354,35 @@ class ReportSummary(BaseModel):
     resolved_tickets: int
     sla_breached: int
     unassigned: int
+
+
+class StatusCount(BaseModel):
+    status: str
+    count: int
+
+
+class PriorityCount(BaseModel):
+    priority: str
+    count: int
+
+
+class TrendPoint(BaseModel):
+    date: str
+    created: int
+    resolved: int
+
+
+class DashboardData(BaseModel):
+    total_tickets: int
+    open_tickets: int
+    resolved_tickets: int
+    closed_tickets: int
+    unassigned: int
+    sla_breached: int
+    avg_resolution_hours: float | None
+    by_status: list[StatusCount]
+    by_priority: list[PriorityCount]
+    trend: list[TrendPoint]
 
 
 class EventOut(BaseModel):
