@@ -25,6 +25,9 @@ EVENT_TYPES: dict[str, EventType] = {
     "ticket.status_changed": EventType(
         "ticket.status_changed", 1, "A ticket changed status (from -> to)."
     ),
+    "ticket.updated": EventType(
+        "ticket.updated", 1, "A ticket's metadata (title/priority/category/project/deadline) changed."
+    ),
 }
 
 # Required payload keys per event type. emit_event() rejects a payload that is
@@ -32,6 +35,7 @@ EVENT_TYPES: dict[str, EventType] = {
 REQUIRED_PAYLOAD_KEYS: dict[str, tuple[str, ...]] = {
     "ticket.created": ("ticket_id", "ticket_number"),
     "ticket.status_changed": ("ticket_id", "from_status", "to_status"),
+    "ticket.updated": ("ticket_id",),
 }
 
 
