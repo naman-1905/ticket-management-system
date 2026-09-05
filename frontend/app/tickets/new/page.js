@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import RequireAuth from "../../components/RequireAuth";
@@ -12,6 +12,7 @@ import Select from "../../components/ui/Select";
 import Textarea from "../../components/ui/Textarea";
 import { Card } from "../../components/ui/Card";
 import { api } from "../../../lib/api";
+import { TICKET_CATEGORIES } from "../../../lib/constants";
 
 const fieldVariants = {
   hidden: { opacity: 0, y: 8 },
@@ -28,8 +29,15 @@ function NewTicketForm() {
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("P3");
   const [category, setCategory] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [projects, setProjects] = useState([]);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    api.listProjects().then(setProjects).catch(() => {});
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -41,6 +49,8 @@ function NewTicketForm() {
         description,
         priority,
         category: category || undefined,
+        project_id: projectId || undefined,
+        due_at: dueAt ? new Date(dueAt).toISOString() : undefined,
       });
       router.push(`/tickets/${ticket.id}`);
     } catch (err) {
@@ -86,18 +96,46 @@ function NewTicketForm() {
               <option value="P3">P3 — Normal</option>
               <option value="P4">P4 — Low</option>
             </Select>
-            <Input
+            <Select
               label="Category (optional)"
-              maxLength={50}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
+              className="flex-1"
+            >
+              <option value="">No category</option>
+              {TICKET_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </Select>
+          </motion.div>
+          <motion.div custom={3} initial="hidden" animate="visible" variants={fieldVariants} className="flex gap-4">
+            <Select
+              label="Project (optional)"
+              value={projectId}
+              onChange={(e) => setProjectId(e.target.value)}
+              className="flex-1"
+            >
+              <option value="">No project</option>
+              {projects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+            <Input
+              label="Deadline (optional)"
+              type="datetime-local"
+              value={dueAt}
+              onChange={(e) => setDueAt(e.target.value)}
               className="flex-1"
             />
           </motion.div>
 
           {error && <p className="text-sm text-danger">{error}</p>}
 
-          <motion.div custom={3} initial="hidden" animate="visible" variants={fieldVariants}>
+          <motion.div custom={4} initial="hidden" animate="visible" variants={fieldVariants}>
             <Button type="submit" disabled={submitting}>
               {submitting ? "Creating…" : "Create ticket"}
             </Button>
