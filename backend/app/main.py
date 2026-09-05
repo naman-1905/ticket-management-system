@@ -19,6 +19,7 @@ from .routers import (
     auth,
     users,
     tickets,
+    projects,
     sla,
     audit,
     organizations,
@@ -136,6 +137,7 @@ async def version():
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
 app.include_router(tickets.router, prefix="/api/v1/tickets", tags=["tickets"])
+app.include_router(projects.router, prefix="/api/v1/projects", tags=["projects"])
 app.include_router(sla.router, prefix="/api/v1", tags=["sla"])
 app.include_router(audit.router, prefix="/api/v1/audit", tags=["audit"])
 app.include_router(organizations.router, prefix="/api/v1/organizations", tags=["organizations"])
