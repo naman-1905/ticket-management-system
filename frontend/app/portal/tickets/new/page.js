@@ -11,6 +11,7 @@ import Select from "../../../components/ui/Select";
 import Textarea from "../../../components/ui/Textarea";
 import { Card } from "../../../components/ui/Card";
 import { api } from "../../../../lib/api";
+import { TICKET_CATEGORIES } from "../../../../lib/constants";
 
 function PortalNewTicket() {
   const router = useRouter();
@@ -18,6 +19,7 @@ function PortalNewTicket() {
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("P3");
   const [category, setCategory] = useState("");
+  const [dueAt, setDueAt] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,7 +31,7 @@ function PortalNewTicket() {
       const idempotencyKey =
         typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : undefined;
       const ticket = await api.createTicket(
-        { title, description, priority, category: category || undefined },
+        { title, description, priority, category: category || undefined, due_at: dueAt ? new Date(dueAt).toISOString() : undefined },
         idempotencyKey
       );
       router.push("/portal/tickets");
@@ -69,14 +71,26 @@ function PortalNewTicket() {
               <option value="P3">P3 — Normal</option>
               <option value="P4">P4 — Low</option>
             </Select>
-            <Input
+            <Select
               label="Category (optional)"
-              maxLength={50}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="flex-1"
-            />
+            >
+              <option value="">No category</option>
+              {TICKET_CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </Select>
           </div>
+          <Input
+            label="Needed by (optional)"
+            type="datetime-local"
+            value={dueAt}
+            onChange={(e) => setDueAt(e.target.value)}
+          />
 
           {error && <p className="text-sm text-danger">{error}</p>}
 
