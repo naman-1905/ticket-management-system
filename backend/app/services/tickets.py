@@ -113,6 +113,8 @@ async def create_ticket(
     source: str = "WEB",
     organization_id: uuid.UUID | None = None,
     requester_contact_id: uuid.UUID | None = None,
+    due_at: datetime | None = None,
+    project_id: uuid.UUID | None = None,
     idempotency_key: str | None = None,
 ) -> Ticket:
     if not await user_has_permission(db, user, "ticket.create"):
@@ -150,6 +152,8 @@ async def create_ticket(
         customer_id=user.id if user.user_type == "customer" else (contact.user_id if contact and contact.user_id else user.id),
         requester_contact_id=contact.id if contact else None,
         organization_id=organization_id or (contact.organization_id if contact else None),
+        project_id=project_id,
+        due_at=due_at,
         created_by=user.id,
     )
     ticket.search_vector = build_search_vector(ticket)
@@ -171,6 +175,49 @@ async def create_ticket(
         },
     )
     await save_idempotent(db, user, endpoint, idempotency_key, 201, ticket_to_dict(ticket))
+    return ticket
+
+
+def _serialize_value(value):
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    return value
+
+
+async def update_ticket(
+    db: AsyncSession,
+    user: User,
+    ticket: Ticket,
+    *,
+    changes: dict,
+    request_id: str | None = None,
+) -> Ticket:
+    """Apply a partial set of metadata fields to a ticket.
+
+    `changes` is the result of `TicketUpdate.model_dump(exclude_unset=True)`, so a key
+    that is present but `None` means "clear this field" (e.g. remove the deadline).
+    """
+    keys = [k for k in changes if k in ("title", "description", "priority", "category", "project_id", "due_at")]
+    if not keys:
+        return ticket
+    old_values = {k: _serialize_value(getattr(ticket, k)) for k in keys}
+    for k in keys:
+        setattr(ticket, k, changes[k])
+    if "title" in keys or "description" in keys:
+        ticket.search_vector = build_search_vector(ticket)
+    new_values = {k: _serialize_value(changes[k]) for k in keys}
+    ticket.version += 1
+    ticket.updated_at = datetime.now(timezone.utc)
+    await audit_log(
+        db, user, "ticket.updated", "ticket", ticket.id,
+        old_values=old_values, new_values=new_values, correlation_id=request_id,
+    )
+    await emit_event(
+        db, ticket.tenant_id, "ticket.updated", "ticket", ticket.id,
+        {"ticket_id": str(ticket.id), "fields": keys},
+    )
     return ticket
 
 
