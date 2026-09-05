@@ -66,6 +66,41 @@ ticket-management-system/
 | Auth     | JWT access tokens, opaque refresh tokens, Argon2 password hashing |
 | Database | PostgreSQL |
 
+## Roles & Permissions
+
+Access is controlled by **role-based permissions** within each tenant. Permissions are checked on every protected API route and in the frontend UI.
+
+### Staff roles
+
+| Role | Description |
+| ---- | ----------- |
+| **OWNER** | Full tenant access — all permissions, including `sla.override`, `user.manage`, `settings.manage`, and `audit.view`. The first user who registers a tenant is assigned this role. |
+| **ADMIN** | Same as OWNER except cannot override SLA deadlines (`sla.override`). |
+| **SUPERVISOR** | Team and queue management, ticket assignment, SLA override, reports, audit logs, organizations, contacts, automations, and knowledge base management. |
+| **AGENT** | Day-to-day ticket work — view, create, update, assign, and transition tickets; internal and public comments; SLA viewing; basic reports; knowledge base. |
+
+### Customer roles
+
+| Role | Description |
+| ---- | ----------- |
+| **CUSTOMER** | Customer portal — view own tickets, create tickets, post public comments, browse the knowledge base. |
+| **CUSTOMER_ADMIN** | Same as CUSTOMER plus `contact.manage` (manage contacts within their organization). |
+
+### User types
+
+Each user has a `user_type` of either `staff` (OWNER, ADMIN, SUPERVISOR, AGENT) or `customer` (CUSTOMER, CUSTOMER_ADMIN). Staff users see the agent dashboard; customer users see the portal.
+
+### Platform admin
+
+Users with `is_platform_admin = true` in the database bypass all permission checks across every tenant. This flag is not exposed via the API and is intended for platform operators only.
+
+### Managing roles
+
+- Register at `/register` to create a new tenant; the registering user becomes **OWNER**.
+- Existing users can be promoted or demoted at `/admin/users` (requires `user.manage` permission) or via `PATCH /api/v1/users/{id}/role`.
+
+Role definitions and default permission mappings live in `backend/app/core/permissions.py`.
+
 ## Prerequisites
 
 - Python 3.12+
@@ -225,7 +260,7 @@ Requests use a Bearer token:
 Authorization: Bearer <access_token>
 ```
 
-Register or log in to receive an access/refresh token pair. The first registered account in a tenant becomes an administrator.
+Register or log in to receive an access/refresh token pair. The first registered account in a tenant becomes the **OWNER** with full access.
 
 ### Pagination
 
