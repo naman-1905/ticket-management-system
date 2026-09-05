@@ -17,8 +17,8 @@ import Spinner from "../components/ui/Spinner";
 import { ListPanel } from "../components/ui/Card";
 import Input from "../components/ui/Input";
 import { api } from "../../lib/api";
-import { TICKET_STATUSES, TICKET_PRIORITIES } from "../../lib/constants";
-import { formatStatus } from "../../lib/format";
+import { TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from "../../lib/constants";
+import { formatStatus, formatCategory, formatDate } from "../../lib/format";
 
 function TicketsPage() {
   const [items, setItems] = useState([]);
@@ -29,8 +29,19 @@ function TicketsPage() {
   const [priority, setPriority] = useState("");
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [participantId, setParticipantId] = useState("");
+  const [category, setCategory] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [agents, setAgents] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    api.listAgents().then(setAgents).catch(() => {});
+    api.listProjects().then(setProjects).catch(() => {});
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -44,7 +55,7 @@ function TicketsPage() {
     let cancelled = false;
     async function load() {
       try {
-        const data = await api.listTickets({ page, size, status, priority, q: query });
+        const data = await api.listTickets({ page, size, status, priority, category, project_id: projectId, q: query, assignee_id: assigneeId, participant_id: participantId });
         if (!cancelled) {
           setItems(data.items);
           setTotal(data.total);
@@ -58,7 +69,7 @@ function TicketsPage() {
     }
     load();
     return () => { cancelled = true; };
-  }, [page, size, status, priority, query]);
+  }, [page, size, status, priority, category, projectId, query, assigneeId, participantId]);
 
   const totalPages = Math.max(1, Math.ceil(total / size));
 
@@ -116,6 +127,66 @@ function TicketsPage() {
             </option>
           ))}
         </Select>
+        <Select
+          value={category}
+          onChange={(e) => {
+            setPage(1);
+            setCategory(e.target.value);
+          }}
+          className="rounded-full px-4"
+        >
+          <option value="">All categories</option>
+          {TICKET_CATEGORIES.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={projectId}
+          onChange={(e) => {
+            setPage(1);
+            setProjectId(e.target.value);
+          }}
+          className="rounded-full px-4"
+        >
+          <option value="">All projects</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={assigneeId}
+          onChange={(e) => {
+            setPage(1);
+            setAssigneeId(e.target.value);
+          }}
+          className="rounded-full px-4"
+        >
+          <option value="">All assignees</option>
+          {agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.full_name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          value={participantId}
+          onChange={(e) => {
+            setPage(1);
+            setParticipantId(e.target.value);
+          }}
+          className="rounded-full px-4"
+        >
+          <option value="">All participants</option>
+          {agents.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.full_name}
+            </option>
+          ))}
+        </Select>
       </div>
 
       {error && <p className="mb-4 text-sm text-danger">{error}</p>}
@@ -135,6 +206,17 @@ function TicketsPage() {
                     <PriorityBadge priority={t.priority} />
                   </div>
                   <p className="truncate font-medium text-foreground">{t.title}</p>
+                  {(t.category || t.project_name || t.due_at) && (
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      {formatCategory(t.category) && (
+                        <span className="rounded-full border border-border bg-surface px-2 py-0.5">
+                          {formatCategory(t.category)}
+                        </span>
+                      )}
+                      {t.project_name && <span>{t.project_name}</span>}
+                      {t.due_at && <span>Due {formatDate(t.due_at)}</span>}
+                    </div>
+                  )}
                   {t.assignee_name && (
                     <p className="truncate text-xs text-muted-foreground">Assigned to {t.assignee_name}</p>
                   )}
