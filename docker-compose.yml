@@ -6,6 +6,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      GOOGLE_CLIENT_CREDENTIALS_FILE: /app/secrets/ticket-client.json
+    volumes:
+      - ./ticket-client.json:/app/secrets/ticket-client.json:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     expose:
@@ -19,6 +23,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      GOOGLE_CLIENT_CREDENTIALS_FILE: /app/secrets/ticket-client.json
+    volumes:
+      - ./ticket-client.json:/app/secrets/ticket-client.json:ro
     command: ["python", "-m", "app.jobs.worker"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
