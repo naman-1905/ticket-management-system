@@ -18,7 +18,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${dmSans.variable} min-h-screen bg-background text-foreground antialiased font-sans`}>
+      <body className={`${dmSans.variable} min-h-screen overflow-x-hidden bg-background text-foreground antialiased font-sans`}>
         <ThemeProvider>
           <AuthProvider>
             <Navbar />
