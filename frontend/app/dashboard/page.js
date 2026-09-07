@@ -134,11 +134,11 @@ function DashboardPage() {
             <h2 className="text-base font-semibold text-foreground">{CHART_META[activeChart].title}</h2>
             <p className="text-xs text-muted-foreground">{CHART_META[activeChart].sub}</p>
           </div>
-          <Tabs options={CHART_TABS} value={activeChart} onChange={setActiveChart} />
+          <Tabs options={CHART_TABS} value={activeChart} onChange={setActiveChart} className="w-full sm:w-auto" />
         </div>
 
         {activeChart === "activity" && (
-          <div className="mb-3 flex items-center gap-4">
+          <div className="mb-3 flex flex-wrap items-center gap-3 sm:gap-4">
             {AREA_SERIES.map((s) => (
               <span key={s.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
