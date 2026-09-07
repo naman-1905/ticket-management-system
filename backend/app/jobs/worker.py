@@ -8,10 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from ..config import settings
 from ..db import engine
-from ..models import WorkerHeartbeat, Job
+from ..models import WorkerHeartbeat, Job, User, EmailSyncState
 from ..services.sla import process_sla_breaches
 from ..services.events import relay_events
 from ..services.event_consumers import register_builtin_consumers
+from ..services.gmail_sync import sync_and_create_tickets
 
 logger = logging.getLogger(__name__)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
@@ -59,12 +60,37 @@ async def process_jobs(db: AsyncSession) -> int:
     return count
 
 
+async def process_email_sync(db: AsyncSession):
+    """Periodic email sync for all users with auto-sync enabled."""
+    now = datetime.now(timezone.utc)
+    interval = settings.email_sync_interval_seconds
+
+    # Find users with enabled sync who are past their interval
+    states = (
+        await db.execute(
+            select(EmailSyncState).where(EmailSyncState.enabled == True)  # noqa: E712
+        )
+    ).scalars().all()
+
+    for state in states:
+        if state.last_synced_at and (now - state.last_synced_at).total_seconds() < interval:
+            continue
+        user = await db.get(User, state.user_id)
+        if not user or not user.is_active:
+            continue
+        try:
+            await sync_and_create_tickets(db, user)
+        except Exception as exc:
+            logger.warning("Email sync failed for user %s: %s", user.id, exc)
+
+
 async def run_once():
     async with SessionLocal() as db:
         await heartbeat(db)
         await process_sla_breaches(db)
         await process_jobs(db)
         await relay_events(db)
+        await process_email_sync(db)
         await db.commit()
 
 
