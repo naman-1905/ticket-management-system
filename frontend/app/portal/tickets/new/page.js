@@ -61,7 +61,7 @@ function PortalNewTicket() {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-col sm:flex-row">
             <Select
               label="Priority"
               value={priority}
