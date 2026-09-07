@@ -1,4 +1,19 @@
+import json
+from pathlib import Path
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _load_google_oauth_credentials(credentials_file: str) -> tuple[str, str]:
+    if not credentials_file:
+        return "", ""
+    path = Path(credentials_file)
+    if not path.is_file():
+        return "", ""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    web = data.get("web") or data.get("installed") or {}
+    return web.get("client_id", ""), web.get("client_secret", "")
 
 
 class Settings(BaseSettings):
@@ -13,7 +28,8 @@ class Settings(BaseSettings):
     worker_poll_seconds: int = 30
     login_rate_limit_per_minute: int = 20
 
-    # Google OAuth
+    # Google OAuth (client id/secret loaded from JSON credentials file)
+    google_client_credentials_file: str = ""
     google_client_id: str = ""
     google_client_secret: str = ""
     google_redirect_uri: str = "http://localhost:3000/auth/google/callback"
@@ -27,6 +43,16 @@ class Settings(BaseSettings):
     email_sync_interval_seconds: int = 300
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @model_validator(mode="after")
+    def _load_google_credentials(self):
+        if self.google_client_credentials_file:
+            client_id, client_secret = _load_google_oauth_credentials(
+                self.google_client_credentials_file
+            )
+            self.google_client_id = client_id
+            self.google_client_secret = client_secret
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:
