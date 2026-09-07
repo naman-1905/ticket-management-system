@@ -64,13 +64,9 @@ pipeline {
                         credentialsId: 'ticket-env',
                         variable: 'TICKET_ENV_FILE'
                     ),
-                    string(
-                        credentialsId: 'GOOGLE_CLIENT_ID',
-                        variable: 'GOOGLE_CLIENT_ID'
-                    ),
-                    string(
-                        credentialsId: 'GOOGLE_CLIENT_SECRET',
-                        variable: 'GOOGLE_CLIENT_SECRET'
+                    file(
+                        credentialsId: 'ticket-client-json',
+                        variable: 'GOOGLE_CLIENT_JSON_FILE'
                     ),
                     string(
                         credentialsId: 'GOOGLE_REDIRECT_URI',
@@ -93,10 +89,9 @@ pipeline {
                         set -e
 
                         cp "$TICKET_ENV_FILE" .env
+                        cp "$GOOGLE_CLIENT_JSON_FILE" ticket-client.json
 
                         {
-                            printf 'GOOGLE_CLIENT_ID=%s\n' "$GOOGLE_CLIENT_ID"
-                            printf 'GOOGLE_CLIENT_SECRET=%s\n' "$GOOGLE_CLIENT_SECRET"
                             printf 'GOOGLE_REDIRECT_URI=%s\n' "$GOOGLE_REDIRECT_URI"
                             printf 'LLM_BASE_URL=%s\n' "$LLM_BASE_URL"
                             printf 'LLM_MODEL=%s\n' "$LLM_MODEL"
