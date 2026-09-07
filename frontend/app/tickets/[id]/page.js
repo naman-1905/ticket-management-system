@@ -195,9 +195,9 @@ function TicketDetail() {
       {error && <p className="mb-4 text-sm text-danger">{error}</p>}
 
       <Card className="mb-6">
-        <div className="mb-2 flex items-center justify-between">
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="font-mono text-xs text-muted-foreground">{ticket.ticket_number}</span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <PriorityBadge priority={ticket.priority} />
             <StatusBadge status={ticket.status} />
           </div>
@@ -255,10 +255,10 @@ function TicketDetail() {
       </Card>
 
       <Card className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-sm font-semibold tracking-tight text-foreground">Details</h2>
           {canEditMeta && (
-            <Button type="button" variant="secondary" onClick={handleSaveMeta} disabled={savingMeta}>
+            <Button type="button" variant="secondary" onClick={handleSaveMeta} disabled={savingMeta} className="w-full sm:w-auto">
               {savingMeta ? "Saving…" : "Save details"}
             </Button>
           )}
@@ -330,7 +330,7 @@ function TicketDetail() {
                 : "border-border bg-surface"
             }`}
           >
-            <div className="mb-1 flex items-center justify-between">
+            <div className="mb-1 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <span className="text-xs font-medium text-foreground">{c.author_name || "Unknown"}</span>
               <span className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString()}</span>
             </div>
@@ -369,7 +369,7 @@ function TicketDetail() {
             value={commentBody}
             onChange={(e) => setCommentBody(e.target.value)}
           />
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {canInternal ? (
               <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input
@@ -383,20 +383,20 @@ function TicketDetail() {
             ) : (
               <span />
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
               {hasPermission(user, "ticket.transition") && ticket.status !== "CLOSED" && (
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={handleCloseTicket}
                   disabled={closing}
-                  className="gap-1.5"
+                  className="w-full gap-1.5 sm:w-auto"
                 >
                   <XCircle size={16} strokeWidth={2} />
                   {closing ? "Closing…" : "Close ticket"}
                 </Button>
               )}
-              <Button type="submit" disabled={posting}>
+              <Button type="submit" disabled={posting} className="w-full sm:w-auto">
                 {posting ? "Posting…" : "Add comment"}
               </Button>
             </div>
