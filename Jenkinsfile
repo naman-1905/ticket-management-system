@@ -63,12 +63,45 @@ pipeline {
                     file(
                         credentialsId: 'ticket-env',
                         variable: 'TICKET_ENV_FILE'
+                    ),
+                    string(
+                        credentialsId: 'GOOGLE_CLIENT_ID',
+                        variable: 'GOOGLE_CLIENT_ID'
+                    ),
+                    string(
+                        credentialsId: 'GOOGLE_CLIENT_SECRET',
+                        variable: 'GOOGLE_CLIENT_SECRET'
+                    ),
+                    string(
+                        credentialsId: 'GOOGLE_REDIRECT_URI',
+                        variable: 'GOOGLE_REDIRECT_URI'
+                    ),
+                    string(
+                        credentialsId: 'LLM_BASE_URL',
+                        variable: 'LLM_BASE_URL'
+                    ),
+                    string(
+                        credentialsId: 'LLM_MODEL',
+                        variable: 'LLM_MODEL'
+                    ),
+                    string(
+                        credentialsId: 'LLM_API_KEY',
+                        variable: 'LLM_API_KEY'
                     )
                 ]) {
                     sh '''
                         set -e
 
                         cp "$TICKET_ENV_FILE" .env
+
+                        {
+                            printf 'GOOGLE_CLIENT_ID=%s\n' "$GOOGLE_CLIENT_ID"
+                            printf 'GOOGLE_CLIENT_SECRET=%s\n' "$GOOGLE_CLIENT_SECRET"
+                            printf 'GOOGLE_REDIRECT_URI=%s\n' "$GOOGLE_REDIRECT_URI"
+                            printf 'LLM_BASE_URL=%s\n' "$LLM_BASE_URL"
+                            printf 'LLM_MODEL=%s\n' "$LLM_MODEL"
+                            printf 'LLM_API_KEY=%s\n' "$LLM_API_KEY"
+                        } >> .env
 
                         echo "=== Build target: ${BUILD_TARGET} ==="
                         echo "=== ENV keys ==="
