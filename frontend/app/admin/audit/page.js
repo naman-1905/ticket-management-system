@@ -48,7 +48,7 @@ function AuditPage() {
         <ListPanel>
           {items.map((log) => (
             <div key={log.id} className="px-4 py-3 text-sm">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                 <span className="font-medium text-foreground">{formatAuditAction(log.action)}</span>
                 <span className="text-xs text-muted-foreground">{new Date(log.created_at).toLocaleString()}</span>
               </div>
