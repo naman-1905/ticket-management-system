@@ -202,6 +202,15 @@ export const api = {
   createSavedView: (payload) => request("/saved-views", { method: "POST", body: payload }),
   listMacros: () => request("/macros"),
   listTags: () => request("/tags"),
+
+  // Gmail sync
+  syncGmail: () => request("/gmail/sync", { method: "POST" }),
+  getGmailStatus: () => request("/gmail/status"),
+  updateGmailSettings: (payload) => request("/gmail/settings", { method: "PATCH", body: payload }),
+
+  // Google OAuth
+  googleAuthLogin: () => request("/auth/google/login", { auth: false }),
+  googleAuthCallback: (code) => request(`/auth/google/callback?code=${encodeURIComponent(code)}`, { auth: false }),
 };
 
 export { setTokens, clearTokens, getAccessToken };
