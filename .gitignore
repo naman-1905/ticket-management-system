@@ -1,4 +1,5 @@
 .env
+ticket-client.json
 .venv/
 venv/
 env/
