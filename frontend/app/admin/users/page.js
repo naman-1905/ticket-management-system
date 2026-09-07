@@ -68,7 +68,7 @@ function UsersPage() {
           {users.map((u) => (
             <div
             key={u.id}
-            className="flex items-center justify-between border-b border-border/50 px-4 py-3 last:border-0"
+            className="flex flex-col gap-3 border-b border-border/50 px-4 py-3 last:border-0 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0">
               <p className="font-medium text-foreground">{u.full_name}</p>
@@ -79,7 +79,7 @@ function UsersPage() {
               value={u.role}
               disabled={updatingId === u.id}
               onChange={(e) => handleRoleChange(u.id, e.target.value)}
-              className="rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium shadow-none outline-none transition-colors hover:bg-muted focus:ring-2 focus:ring-primary/20"
+              className="w-full rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium shadow-none outline-none transition-colors hover:bg-muted focus:ring-2 focus:ring-primary/20 sm:w-auto"
             >
               {ROLES.map((r) => (
                 <option key={r} value={r}>
