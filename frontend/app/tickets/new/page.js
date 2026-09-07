@@ -84,7 +84,7 @@ function NewTicketForm() {
               onChange={(e) => setDescription(e.target.value)}
             />
           </motion.div>
-          <motion.div custom={2} initial="hidden" animate="visible" variants={fieldVariants} className="flex gap-4">
+          <motion.div custom={2} initial="hidden" animate="visible" variants={fieldVariants} className="flex flex-col gap-4 sm:flex-row">
             <Select
               label="Priority"
               value={priority}
@@ -110,7 +110,7 @@ function NewTicketForm() {
               ))}
             </Select>
           </motion.div>
-          <motion.div custom={3} initial="hidden" animate="visible" variants={fieldVariants} className="flex gap-4">
+          <motion.div custom={3} initial="hidden" animate="visible" variants={fieldVariants} className="flex flex-col gap-4 sm:flex-row">
             <Select
               label="Project (optional)"
               value={projectId}
