@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { motion } from "framer-motion";
 import RequireAuth from "../components/RequireAuth";
 import StatusBadge from "../components/StatusBadge";
@@ -37,11 +37,29 @@ function TicketsPage() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     api.listAgents().then(setAgents).catch(() => {});
     api.listProjects().then(setProjects).catch(() => {});
   }, []);
+
+  async function handleGmailSync() {
+    setSyncing(true);
+    try {
+      await api.syncGmail();
+      // Reload tickets after sync
+      setLoading(true);
+      const data = await api.listTickets({ page, size, status, priority, category, project_id: projectId, q: query, assignee_id: assigneeId, participant_id: participantId });
+      setItems(data.items);
+      setTotal(data.total);
+    } catch (err) {
+      setError(err.message || "Sync failed");
+    } finally {
+      setSyncing(false);
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -79,12 +97,18 @@ function TicketsPage() {
         title="Tickets"
         description="Track and manage support requests."
         action={
-          <Link href="/tickets/new">
-            <Button className="gap-1.5">
-              <Plus className="h-4 w-4" strokeWidth={2} />
-              New ticket
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleGmailSync} disabled={syncing} className="gap-1.5">
+              <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} strokeWidth={2} />
+              Sync emails
             </Button>
-          </Link>
+            <Link href="/tickets/new">
+              <Button className="gap-1.5">
+                <Plus className="h-4 w-4" strokeWidth={2} />
+                New ticket
+              </Button>
+            </Link>
+          </div>
         }
       />
 
