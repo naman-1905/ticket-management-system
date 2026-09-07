@@ -97,7 +97,7 @@ function TicketsPage() {
         title="Tickets"
         description="Track and manage support requests."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <Button variant="outline" onClick={handleGmailSync} disabled={syncing} className="gap-1.5">
               <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} strokeWidth={2} />
               Sync emails
@@ -112,14 +112,14 @@ function TicketsPage() {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-end gap-3">
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
         <Input
           label="Search"
           placeholder="Search by number, title, description…"
           aria-label="Search tickets"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="min-w-[240px] flex-1"
+          className="w-full sm:col-span-2 lg:min-w-[240px] lg:flex-1"
         />
         <Select
           value={status}
@@ -127,7 +127,7 @@ function TicketsPage() {
             setPage(1);
             setStatus(e.target.value);
           }}
-          className="rounded-full px-4"
+          className="w-full rounded-full px-4 lg:w-auto"
         >
           <option value="">All statuses</option>
           {TICKET_STATUSES.map((s) => (
@@ -142,7 +142,7 @@ function TicketsPage() {
             setPage(1);
             setPriority(e.target.value);
           }}
-          className="rounded-full px-4"
+          className="w-full rounded-full px-4 lg:w-auto"
         >
           <option value="">All priorities</option>
           {TICKET_PRIORITIES.map((p) => (
@@ -157,7 +157,7 @@ function TicketsPage() {
             setPage(1);
             setCategory(e.target.value);
           }}
-          className="rounded-full px-4"
+          className="w-full rounded-full px-4 lg:w-auto"
         >
           <option value="">All categories</option>
           {TICKET_CATEGORIES.map((c) => (
@@ -172,7 +172,7 @@ function TicketsPage() {
             setPage(1);
             setProjectId(e.target.value);
           }}
-          className="rounded-full px-4"
+          className="w-full rounded-full px-4 lg:w-auto"
         >
           <option value="">All projects</option>
           {projects.map((p) => (
@@ -187,7 +187,7 @@ function TicketsPage() {
             setPage(1);
             setAssigneeId(e.target.value);
           }}
-          className="rounded-full px-4"
+          className="w-full rounded-full px-4 lg:w-auto"
         >
           <option value="">All assignees</option>
           {agents.map((a) => (
@@ -202,7 +202,7 @@ function TicketsPage() {
             setPage(1);
             setParticipantId(e.target.value);
           }}
-          className="rounded-full px-4"
+          className="w-full rounded-full px-4 lg:w-auto"
         >
           <option value="">All participants</option>
           {agents.map((a) => (
@@ -223,7 +223,7 @@ function TicketsPage() {
         <ListPanel>
           {items.map((t) => (
             <motion.div key={t.id} whileHover={{ backgroundColor: "var(--muted)" }} transition={{ duration: 0.15 }}>
-              <Link href={`/tickets/${t.id}`} className="flex items-center justify-between px-4 py-3">
+              <Link href={`/tickets/${t.id}`} className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                   <div className="mb-0.5 flex items-center gap-2">
                     <span className="font-mono text-xs text-muted-foreground">{t.ticket_number}</span>
@@ -245,7 +245,7 @@ function TicketsPage() {
                     <p className="truncate text-xs text-muted-foreground">Assigned to {t.assignee_name}</p>
                   )}
                 </div>
-                <StatusBadge status={t.status} />
+                <StatusBadge status={t.status} className="self-start sm:self-center" />
               </Link>
             </motion.div>
           ))}
