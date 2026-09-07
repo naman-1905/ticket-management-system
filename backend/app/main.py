@@ -33,6 +33,8 @@ from .routers import (
     attachments,
     automations,
     events,
+    google_auth,
+    gmail,
 )
 
 logger = logging.getLogger(__name__)
@@ -151,3 +153,5 @@ app.include_router(csat.router, prefix="/api/v1/csat", tags=["csat"])
 app.include_router(attachments.router, prefix="/api/v1/attachments", tags=["attachments"])
 app.include_router(automations.router, prefix="/api/v1", tags=["automations"])
 app.include_router(events.router, prefix="/api/v1", tags=["events"])
+app.include_router(google_auth.router, prefix="/api/v1/auth", tags=["google-auth"])
+app.include_router(gmail.router, prefix="/api/v1/gmail", tags=["gmail"])
