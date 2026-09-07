@@ -59,14 +59,14 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
-      <section className="flex flex-col items-center justify-center px-4 py-24 text-center">
+      <section className="flex flex-col items-center justify-center px-4 py-16 text-center sm:py-24">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
           className="mx-auto max-w-3xl"
         >
-          <h1 className="mb-6 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+          <h1 className="mb-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl">
             Modern Service Desk for Your Team
           </h1>
           <p className="mb-8 text-lg text-muted-foreground">
