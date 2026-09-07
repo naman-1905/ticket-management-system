@@ -29,7 +29,31 @@ export default function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
 
-  if (!user) return null;
+  // Show minimal nav for unauthenticated users
+  if (!user) {
+    return (
+      <header className="sticky top-0 z-20 flex justify-center px-4 py-4">
+        <div className="grid w-full max-w-5xl grid-cols-[auto_1fr_auto] items-center gap-3 rounded-[2rem] bg-surface px-4 py-2.5 backdrop-blur-md dark:bg-background">
+          <div className="shrink-0">
+            <BrandMark />
+          </div>
+          <nav className="flex items-center justify-center" />
+          <div className="flex shrink-0 items-center gap-2 justify-self-end">
+            <Link href="/login">
+              <button className="rounded-full px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                Login
+              </button>
+            </Link>
+            <Link href="/register">
+              <button className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition-colors hover:opacity-90">
+                Register
+              </button>
+            </Link>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   async function handleLogout() {
     await logout();
