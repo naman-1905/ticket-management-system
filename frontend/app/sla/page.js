@@ -161,7 +161,7 @@ function SlaPage() {
               {editingId === p.id ? (
                 /* ---- Edit mode ---- */
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Input
                       required
                       value={editName}
@@ -172,7 +172,7 @@ function SlaPage() {
                     <Select
                       value={editPriority}
                       onChange={(e) => setEditPriority(e.target.value)}
-                      className="rounded-full w-24"
+                      className="w-full rounded-full sm:w-24"
                     >
                       {["P1", "P2", "P3", "P4"].map((pr) => (
                         <option key={pr} value={pr}>
@@ -230,14 +230,14 @@ function SlaPage() {
                 </div>
               ) : (
                 /* ---- View mode ---- */
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
                     <p className="font-medium text-foreground">{p.name}</p>
                     <p className="text-xs text-muted-foreground">
                       {p.priority} · first response {p.first_response_minutes}m · resolve in {p.resolution_hours}h
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                         p.is_active
