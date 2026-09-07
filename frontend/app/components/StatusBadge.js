@@ -12,10 +12,10 @@ const STYLES = {
   CANCELLED: "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-300",
 };
 
-export default function StatusBadge({ status }) {
+export default function StatusBadge({ status, className = "" }) {
   return (
     <span
-      className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${STYLES[status] || "bg-muted text-muted-foreground"}`}
+      className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${STYLES[status] || "bg-muted text-muted-foreground"} ${className}`}
     >
       {formatStatus(status)}
     </span>
