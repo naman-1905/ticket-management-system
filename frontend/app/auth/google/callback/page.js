@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { api, setTokens } from "../../../lib/api";
-import { useAuth } from "../../../lib/auth-context";
-import { homeForUser } from "../../../lib/permissions";
-import Spinner from "../../components/ui/Spinner";
+import { api, setTokens } from "../../../../lib/api";
+import { useAuth } from "../../../../lib/auth-context";
+import { homeForUser } from "../../../../lib/permissions";
+import Spinner from "../../../components/ui/Spinner";
 
 export default function GoogleCallbackPage() {
   const router = useRouter();
