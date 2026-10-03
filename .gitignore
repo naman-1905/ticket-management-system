@@ -12,7 +12,7 @@ frontend/node_modules
 frontend/.next
 .cursor
 # Internal implementation/planning artifacts (local-only, must never be committed)
-AGENT.md
+# NOTE: `AGENT.md` is intentionally tracked now as part of the Codex/Qwen workflow.
 implementation1.md
 implementation2.md
 summary.md
